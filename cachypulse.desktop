@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CachyPulse
+GenericName=Benchmark e Diagnóstico de Hardware
+Comment=Suíte definitiva de benchmarks (Cinebench, AIDA64, CrystalDiskMark) e otimização para Linux & CachyOS
+Exec=/home/murylo/Downloads/bench/CachyPulse/cachypulse
+Icon=/home/murylo/Downloads/bench/CachyPulse/assets/icon.png
+Terminal=false
+Categories=System;Monitor;HardwareSettings;Utility;
+Keywords=benchmark;aida64;cinebench;crystaldiskmark;stress;furmark;cachyos;hardware;sensors;
+StartupNotify=true

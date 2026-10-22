@@ -1,0 +1,11 @@
+#!/bin/bash
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PYTHONPATH="$DIR:$PYTHONPATH"
+
+# Auto compile native library if not present
+if [ ! -f "$DIR/libcachypulse_native.so" ]; then
+    echo "Compilando biblioteca nativa de alta performance..."
+    make -C "$DIR/native"
+fi
+
+exec python3 "$DIR/main.py" "$@"
