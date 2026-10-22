@@ -132,12 +132,12 @@ class BenchView(QWidget):
         rl.addWidget(rtitle)
 
         ref_text = QLabel(
-            "• AMD Ryzen 9 7950X: ~15.200 pts (152.000 MIPS)<br>"
-            "• Intel Core i7-13700K: ~12.800 pts (128.000 MIPS)<br>"
-            "• AMD Ryzen 7 7700X: ~10.500 pts (105.000 MIPS)<br>"
-            "• <b>Seu AMD Ryzen 5 5600: ~7.050 pts (70.500 MIPS)</b><br>"
-            "• Intel Core i5-12400: ~6.200 pts (62.000 MIPS)<br>"
-            "• AMD Ryzen 5 3600: ~4.900 pts (49.000 MIPS)"
+            "• AMD Ryzen 9 7950X: ~19.500 pts Multi / ~2.950 pts Single<br>"
+            "• Intel Core i7-13700K: ~16.800 pts Multi / ~2.800 pts Single<br>"
+            "• AMD Ryzen 7 7700X: ~13.200 pts Multi / ~2.650 pts Single<br>"
+            "• <b>Seu AMD Ryzen 5 5600: ~7.850 pts Multi / ~1.920 pts Single</b><br>"
+            "• Intel Core i5-12400: ~7.200 pts Multi / ~1.750 pts Single<br>"
+            "• AMD Ryzen 5 3600: ~5.600 pts Multi / ~1.450 pts Single"
         )
         ref_text.setStyleSheet("color: #8C8C8C; font-size: 12.5px; line-height: 1.5;")
         rl.addWidget(ref_text)

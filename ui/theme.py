@@ -9,13 +9,14 @@ DARK_THEME_QSS = """
 QMainWindow, QDialog {
     background-color: #000000;
     color: #F5F5F5;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "Inter", Roboto, sans-serif;
+    font-family: "Fira Sans", "Segoe UI Variable Text", "Segoe UI", "Inter", sans-serif;
     font-size: 13px;
 }
 
 QWidget {
     background-color: transparent;
     color: #F5F5F5;
+    font-family: "Fira Sans", "Segoe UI Variable Text", "Segoe UI", "Inter", sans-serif;
 }
 
 /* ===== Sidebar Navigation ===== */

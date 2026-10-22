@@ -73,14 +73,14 @@ class MainWindow(QMainWindow):
         self.nav_list = QListWidget()
         self.nav_list.setObjectName("NavList")
         nav_items = [
-            "  📊  Visão Geral",
-            "  💻  Sistema & Hardware",
-            "  ⚡  Sensores ao Vivo",
-            "  ⏱️  Benchmarks",
-            "  🔥  Testes de Estresse",
-            "  🎮  Jogos & Gargalo",
-            "  🚀  Otimizador CachyOS",
-            "  🛠️  Ferramentas & Maker"
+            "  VISÃO GERAL",
+            "  SISTEMA & HARDWARE",
+            "  SENSORES AO VIVO",
+            "  BENCHMARKS",
+            "  TESTES DE ESTRESSE",
+            "  JOGOS & GARGALO",
+            "  OTIMIZADOR CACHYOS",
+            "  FERRAMENTAS & MAKER"
         ]
         self.nav_list.addItems(nav_items)
         self.nav_list.setCurrentRow(0)
@@ -93,11 +93,11 @@ class MainWindow(QMainWindow):
         footer_frame = QFrame()
         footer_frame.setProperty("class", "Card")
         ff_layout = QVBoxLayout(footer_frame)
-        ff_layout.setContentsMargins(8, 8, 8, 8)
-        self.lbl_foot_cpu = QLabel("CPU: --% | --°C")
-        self.lbl_foot_cpu.setStyleSheet("color: #00d2ff; font-weight: bold; font-size: 11px;")
-        self.lbl_foot_gpu = QLabel("GPU: --% | --°C")
-        self.lbl_foot_gpu.setStyleSheet("color: #3fb950; font-weight: bold; font-size: 11px;")
+        ff_layout.setContentsMargins(10, 10, 10, 10)
+        self.lbl_foot_cpu = QLabel("CPU: --%  •  --°C")
+        self.lbl_foot_cpu.setStyleSheet("color: #FFFFFF; font-family: 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px;")
+        self.lbl_foot_gpu = QLabel("GPU: --%  •  --°C")
+        self.lbl_foot_gpu.setStyleSheet("color: #8C8C8C; font-family: 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px;")
         ff_layout.addWidget(self.lbl_foot_cpu)
         ff_layout.addWidget(self.lbl_foot_gpu)
         sb_layout.addWidget(footer_frame)
@@ -150,8 +150,8 @@ class MainWindow(QMainWindow):
             cpu_temp = snap.get("cpu_temp", 0)
             gpu_load = snap.get("gpu_load", 0)
             gpu_temp = snap.get("gpu_temp", 0)
-            self.lbl_foot_cpu.setText(f"CPU: {cpu_load:.0f}% | {cpu_temp:.1f}°C")
-            self.lbl_foot_gpu.setText(f"GPU: {gpu_load}% | {gpu_temp}°C")
+            self.lbl_foot_cpu.setText(f"CPU: {cpu_load:.0f}%  •  {cpu_temp:.0f}°C")
+            self.lbl_foot_gpu.setText(f"GPU: {gpu_load}%  •  {gpu_temp}°C")
 
     def closeEvent(self, event):
         self.sensor_monitor.stop()

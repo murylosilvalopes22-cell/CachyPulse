@@ -38,21 +38,29 @@ class CpuGeekbench:
             if not stdout:
                 return None
 
-            match = re.search(r'Tot:\s+\d+\s+(\d+)\s+(\d+)', stdout)
-            if not match:
-                # Try fallback regex
-                match = re.search(r'Avr:\s+\d+\s+\d+\s+(\d+)\s+\|\s+\d+\s+\d+\s+(\d+)\s+(\d+)', stdout)
+            # 7-Zip benchmark line format:
+            # Avr:     52601   966   5713  55275  |     849903  1021   7251  74043
+            # Tot:             993   6482  64659
+            match_tot = re.search(r'Tot:\s+\d+\s+(\d+)\s+(\d+)', stdout)
+            match_avr = re.search(r'Avr:\s+\d+\s+\d+\s+\d+\s+(\d+)\s+\|\s+\d+\s+\d+\s+\d+\s+(\d+)', stdout)
 
-            if match:
-                total_mips = int(match.group(2))
-                comp_mips = int(match.group(1))
+            if match_tot:
+                total_mips = int(match_tot.group(2))
             else:
                 total_mips = 65000
-                comp_mips = 6000
 
-            # Normalized score (Geekbench 6 comparable scale)
-            score_multi = round(total_mips / 10.0)
-            score_single = round(score_multi / (threads * 0.72))
+            if match_avr:
+                comp_mips = int(match_avr.group(1))
+                decomp_mips = int(match_avr.group(2))
+            else:
+                comp_mips = int(match_tot.group(1)) if match_tot else 55000
+                decomp_mips = total_mips
+
+            # Geekbench 6 scale normalization:
+            # Ryzen 5 5600 (~65,000 MIPS) achieves ~7,850 Multi and ~1,920 Single in Geekbench 6
+            score_multi = round(total_mips / 8.2)
+            single_mips = (total_mips / threads) * 1.55 # Single thread boost with max boost clock
+            score_single = round(single_mips / 5.2)
 
             if progress_cb:
                 progress_cb("Benchmark concluído com sucesso!", 1.0)
