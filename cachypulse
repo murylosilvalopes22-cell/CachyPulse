@@ -1,5 +1,9 @@
 #!/bin/bash
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve canonical path even when called through symlinks
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
+
+cd "$DIR" || exit 1
 export PYTHONPATH="$DIR:$PYTHONPATH"
 
 # Auto compile native library if not present

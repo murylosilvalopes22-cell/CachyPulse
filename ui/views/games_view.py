@@ -118,6 +118,7 @@ class GamesView(QWidget):
 
         main_l = QVBoxLayout(self)
         main_l.setContentsMargins(0, 0, 0, 0)
+        scroll.setWidget(container)
         main_l.addWidget(scroll)
 
         # Bottleneck polling timer
