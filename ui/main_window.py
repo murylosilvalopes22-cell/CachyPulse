@@ -27,9 +27,9 @@ from .views.tools_view import ToolsView
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("CachyPulse — Suíte de Benchmarks & Diagnóstico de Hardware")
-        self.resize(1240, 820)
-        self.setMinimumSize(1000, 700)
+        self.setWindowTitle("CACHYPULSE — Benchmark & Hardware Suite")
+        self.resize(1320, 840)
+        self.setMinimumSize(1120, 660)
 
         # Set Application Icon
         icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets/icon.png")
@@ -62,9 +62,9 @@ class MainWindow(QMainWindow):
         # Brand Title
         brand_layout = QVBoxLayout()
         lbl_title = QLabel("CACHYPULSE")
-        lbl_title.setStyleSheet("font-size: 20px; font-weight: 900; color: #00d2ff; letter-spacing: 1px;")
-        lbl_sub = QLabel("Benchmark & Otimização")
-        lbl_sub.setStyleSheet("font-size: 11px; color: #8b949e; font-weight: bold;")
+        lbl_title.setStyleSheet("font-size: 21px; font-weight: 800; color: #FFFFFF; letter-spacing: 1.5px;")
+        lbl_sub = QLabel("LINUX BENCHMARK & SUITE")
+        lbl_sub.setStyleSheet("font-size: 10px; color: #737373; font-weight: 700; letter-spacing: 1px;")
         brand_layout.addWidget(lbl_title)
         brand_layout.addWidget(lbl_sub)
         sb_layout.addLayout(brand_layout)

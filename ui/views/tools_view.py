@@ -1,5 +1,5 @@
 """
-Tools, Startup Manager, App Installer & Maker Serial View for CachyPulse.
+Tools, Startup Manager, App Installer & Maker Serial View for CachyPulse (Faithful to ResetExplode).
 """
 
 from PyQt6.QtWidgets import (
@@ -16,27 +16,38 @@ class ToolsView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        layout = QVBoxLayout(self)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 20, 20, 20)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_startup_tab(), "Inicialização do Sistema")
-        self.tabs.addTab(self._build_apps_tab(), "Instalar Aplicativos Úteis")
-        self.tabs.addTab(self._build_maker_tab(), "Maker & Portas Seriais (Arduino/ESP)")
+        self.tabs.addTab(self._build_apps_tab(), "Instalar Aplicativos")
+        self.tabs.addTab(self._build_maker_tab(), "Maker & Serial (Arduino/ESP)")
 
         layout.addWidget(self.tabs)
+
+        main_l = QVBoxLayout(self)
+        main_l.setContentsMargins(0, 0, 0, 0)
+        scroll.setWidget(container)
+        main_l.addWidget(scroll)
 
     # ------------------ STARTUP TAB ------------------
     def _build_startup_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(14)
 
         top_h = QHBoxLayout()
-        top_h.addWidget(QLabel("Aplicativos que iniciam junto com o ambiente gráfico:"))
+        top_h.addWidget(QLabel("Aplicativos que abrem automaticamente com o sistema:"))
         top_h.addStretch()
         self.btn_refresh_startup = QPushButton("Atualizar")
         self.btn_refresh_startup.clicked.connect(self._refresh_startup)
-        self.btn_toggle_startup = QPushButton("Ativar / Desativar Selecionado")
+        self.btn_toggle_startup = QPushButton("Ativar / Desativar")
         self.btn_toggle_startup.setProperty("class", "Primary")
         self.btn_toggle_startup.clicked.connect(self._toggle_startup)
 
@@ -67,10 +78,11 @@ class ToolsView(QWidget):
             if e.enabled:
                 item_st.setForeground(Qt.GlobalColor.green)
             else:
-                item_st.setForeground(Qt.GlobalColor.red)
+                item_st.setForeground(Qt.GlobalColor.gray)
 
             item_name = QTableWidgetItem(e.name)
             item_cmd = QTableWidgetItem(e.exec_cmd)
+            item_cmd.setForeground(Qt.GlobalColor.darkGray)
             item_type = QTableWidgetItem("Usuário" if e.is_user else "Sistema")
 
             self.table_startup.setItem(i, 0, item_st)
@@ -90,9 +102,10 @@ class ToolsView(QWidget):
     def _build_apps_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(14)
 
         top_h = QHBoxLayout()
-        top_h.addWidget(QLabel("Catálogo de ferramentas essenciais de Jogos, Benchmark e Maker para CachyOS / Arch:"))
+        top_h.addWidget(QLabel("Catálogo de ferramentas essenciais pós-formatação (pacman/paru/yay):"))
         top_h.addStretch()
         self.btn_refresh_apps = QPushButton("Atualizar")
         self.btn_refresh_apps.clicked.connect(self._refresh_apps)
@@ -119,6 +132,7 @@ class ToolsView(QWidget):
         for i, a in enumerate(apps):
             item_name = QTableWidgetItem(a["name"])
             item_cat = QTableWidgetItem(a["category"])
+            item_cat.setForeground(Qt.GlobalColor.gray)
             item_desc = QTableWidgetItem(a["desc"])
 
             self.table_apps.setItem(i, 0, item_name)
@@ -128,6 +142,7 @@ class ToolsView(QWidget):
             if a["installed"]:
                 btn = QPushButton("Instalado")
                 btn.setEnabled(False)
+                btn.setStyleSheet("color: #555; background: #0E0E0E; border: 1px solid #1C1C1C;")
             else:
                 btn = QPushButton("Instalar")
                 btn.setProperty("class", "Primary")
@@ -149,20 +164,21 @@ class ToolsView(QWidget):
     def _build_maker_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(14)
 
         card_perm = QFrame()
         card_perm.setProperty("class", "Card")
         cpl = QVBoxLayout(card_perm)
 
         has_perm, groups = MakerSerial.check_permissions()
-        perm_title = QLabel("Permissões de Usuário para Portas Seriais (uucp / dialout)")
-        perm_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #58a6ff;")
+        perm_title = QLabel("PERMISSÕES DE PORTA SERIAL (GRUPO UUCP / DIALOUT)")
+        perm_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #737373; text-transform: uppercase;")
         cpl.addWidget(perm_title)
 
-        st_text = "Seu usuário tem permissão para ler e gravar em dispositivos seriais." if has_perm else \
-                  "ATENÇÃO: Seu usuário NÃO está no grupo 'uucp'. O Arduino IDE ou monitor serial podem dar 'Permissão negada'."
+        st_text = "Seu usuário tem permissão para acessar placas e monitores seriais." if has_perm else \
+                  "ATENÇÃO: Seu usuário NÃO está no grupo 'uucp'. O Arduino IDE ou monitor serial podem exibir 'Permissão negada'."
         lbl_status = QLabel(st_text)
-        lbl_status.setStyleSheet("color: #3fb950; font-weight: bold;" if has_perm else "color: #f0883e; font-weight: bold;")
+        lbl_status.setStyleSheet("color: #3FB950; font-weight: 700;" if has_perm else "color: #FFAA00; font-weight: 700;")
         cpl.addWidget(lbl_status)
 
         if not has_perm:

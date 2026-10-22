@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include <omp.h>
 #include <immintrin.h>
 
@@ -226,3 +227,31 @@ MemBenchResult mem_run_full_bench(int threads, volatile int *cancel_flag) {
     res.copy_gb_s = mem_measure_copy(threads, cancel_flag);
     return res;
 }
+
+// Native CPU Stress Worker (Runs without Python GIL via OpenMP)
+void cpu_stress_worker(volatile int *stop_flag, int threads) {
+    if (threads <= 0) threads = omp_get_max_threads();
+    omp_set_num_threads(threads);
+
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        double buf[2048];
+        for (int i = 0; i < 2048; i++) buf[i] = (double)(i + tid + 1);
+        uint64_t x = (uint64_t)(tid + 1) * 0x9E3779B97F4A7C15ULL;
+
+        while (stop_flag && !(*stop_flag)) {
+            for (int r = 0; r < 256; r++) {
+                for (int i = 0; i < 2048; i++) {
+                    double v = buf[i];
+                    v = v * 1.0000001 + 0.5;
+                    v = sqrt(v * v + 1.0) + sin(v) * 1e-3;
+                    buf[i] = v > 1e10 ? (double)(i + 1) : v;
+                    x ^= x << 13; x ^= x >> 7; x ^= x << 17;
+                }
+            }
+            if (x == 0) buf[0] = 0;
+        }
+    }
+}
+

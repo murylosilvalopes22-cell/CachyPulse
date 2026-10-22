@@ -1,5 +1,5 @@
 """
-System and Gaming Optimizer View for CachyPulse (Linux & CachyOS).
+System and Gaming Optimizer View for CachyPulse (Faithful to ResetExplode's Monochromatic Aesthetic).
 Provides memory cache flushing, ZRAM compaction, CPU scaling governor switcher,
 CachyOS service status (ananicy-cpp / gamemoded), and heavy process terminator.
 """
@@ -22,20 +22,25 @@ class OptimizerView(QWidget):
 
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setSpacing(18)
+        layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
         # 1. Quick Tweaks Card
         card_quick = QFrame()
         card_quick.setProperty("class", "Card")
         ql = QVBoxLayout(card_quick)
+        ql.setSpacing(10)
 
-        qtitle = QLabel("Otimizações Rápidas de Sistema (CachyOS / Linux)")
-        qtitle.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
+        qtitle = QLabel("OTIMIZAÇÕES DE MEMÓRIA & CACHE (CACHYOS / LINUX)")
+        qtitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #FFFFFF;")
         ql.addWidget(qtitle)
 
-        qdesc = QLabel("Libere memória RAM usada por arquivos em cache temporário do kernel e compacte blocos do ZRAM para evitar uso de disco.")
-        qdesc.setStyleSheet("color: #8b949e; margin-bottom: 12px;")
+        qdesc = QLabel(
+            "Libere memória em espera (pagecache, dentries e inodes) e execute a compactação "
+            "imediata dos blocos de ZRAM para manter o sistema com máxima RAM livre para jogos."
+        )
+        qdesc.setStyleSheet("color: #8C8C8C; font-size: 12.5px; line-height: 1.4;")
+        qdesc.setWordWrap(True)
         ql.addWidget(qdesc)
 
         btn_row = QHBoxLayout()
@@ -56,13 +61,14 @@ class OptimizerView(QWidget):
         card_cpu = QFrame()
         card_cpu.setProperty("class", "Card")
         cl = QVBoxLayout(card_cpu)
+        cl.setSpacing(12)
 
-        ctitle = QLabel("Gerenciador de Energia da CPU & Serviços CachyOS")
-        ctitle.setStyleSheet("font-size: 14px; font-weight: bold; color: #e6edf3;")
+        ctitle = QLabel("GOVERNADOR DA CPU & SERVIÇOS CACHYOS")
+        ctitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #FFFFFF;")
         cl.addWidget(ctitle)
 
         gov_row = QHBoxLayout()
-        gov_row.addWidget(QLabel("Governador da CPU:"))
+        gov_row.addWidget(QLabel("Governador:"))
         self.combo_gov = QComboBox()
         gov_data = SystemOptimizer.get_governors()
         self.combo_gov.addItems(gov_data["available"])
@@ -71,7 +77,8 @@ class OptimizerView(QWidget):
 
         gov_row.addWidget(self.combo_gov)
 
-        self.btn_apply_gov = QPushButton("Aplicar Governador")
+        self.btn_apply_gov = QPushButton("Aplicar")
+        self.btn_apply_gov.setProperty("class", "Primary")
         self.btn_apply_gov.clicked.connect(self._on_apply_governor)
         gov_row.addWidget(self.btn_apply_gov)
         gov_row.addStretch()
@@ -81,10 +88,10 @@ class OptimizerView(QWidget):
         srv = SystemOptimizer.get_cachyos_services()
         srv_row = QHBoxLayout()
         lbl_ananicy = QLabel(f"ananicy-cpp (Auto-Nice): {'ATIVO' if srv.get('ananicy-cpp') else 'INATIVO'}")
-        lbl_ananicy.setStyleSheet(f"background: {'#238636' if srv.get('ananicy-cpp') else '#da3633'}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold;")
+        lbl_ananicy.setStyleSheet(f"background: #141414; border: 1px solid #282828; color: {'#3FB950' if srv.get('ananicy-cpp') else '#DC2626'}; padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 800;")
 
         lbl_gamemode = QLabel(f"Feral GameMode: {'DISPONÍVEL' if srv.get('gamemoded') else 'NÃO INICIADO'}")
-        lbl_gamemode.setStyleSheet(f"background: {'#1f6feb' if srv.get('gamemoded') else '#30363d'}; color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold;")
+        lbl_gamemode.setStyleSheet(f"background: #141414; border: 1px solid #282828; color: {'#00D2FF' if srv.get('gamemoded') else '#737373'}; padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 800;")
 
         srv_row.addWidget(lbl_ananicy)
         srv_row.addWidget(lbl_gamemode)
@@ -97,18 +104,19 @@ class OptimizerView(QWidget):
         card_proc = QFrame()
         card_proc.setProperty("class", "Card")
         pl = QVBoxLayout(card_proc)
+        pl.setSpacing(12)
 
         ph_layout = QHBoxLayout()
-        ph_title = QLabel("Processos com Alto Consumo de RAM (> 150 MB)")
-        ph_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #e6edf3;")
+        ph_title = QLabel("PROCESSOS COM ALTO CONSUMO DE RAM (> 150 MB)")
+        ph_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #FFFFFF;")
         ph_layout.addWidget(ph_title)
         ph_layout.addStretch()
 
-        self.btn_refresh_procs = QPushButton("Atualizar Lista")
+        self.btn_refresh_procs = QPushButton("Atualizar")
         self.btn_refresh_procs.clicked.connect(self._refresh_processes)
         ph_layout.addWidget(self.btn_refresh_procs)
 
-        self.btn_kill_proc = QPushButton("Encerrar Processo Selecionado")
+        self.btn_kill_proc = QPushButton("Encerrar Processo")
         self.btn_kill_proc.setProperty("class", "Danger")
         self.btn_kill_proc.clicked.connect(self._terminate_selected_process)
         ph_layout.addWidget(self.btn_kill_proc)

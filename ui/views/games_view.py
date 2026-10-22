@@ -1,5 +1,5 @@
 """
-Gaming & Bottleneck Diagnostics View for CachyPulse.
+Gaming & Bottleneck Diagnostics View for CachyPulse (Faithful to ResetExplode's Monochromatic Aesthetic).
 Provides real-time Bottleneck Detection (CPU vs GPU vs VRAM vs Thermal),
 Steam game library parser, and One-Click Game Launcher with MangoHud, GameMode, and Gamescope.
 """
@@ -25,24 +25,26 @@ class GamesView(QWidget):
 
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.setSpacing(18)
+        layout.setSpacing(16)
         layout.setContentsMargins(20, 20, 20, 20)
 
         # 1. Bottleneck Diagnostics Card
         self.bn_card = QFrame()
         self.bn_card.setProperty("class", "Card")
         bn_l = QVBoxLayout(self.bn_card)
+        bn_l.setSpacing(10)
 
-        self.lbl_bn_title = QLabel("Detector de Gargalo em Tempo Real")
-        self.lbl_bn_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
+        self.lbl_bn_title = QLabel("DETECTOR DE GARGALO EM TEMPO REAL")
+        self.lbl_bn_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #FFFFFF; letter-spacing: 0.5px;")
         bn_l.addWidget(self.lbl_bn_title)
 
         self.lbl_bn_desc = QLabel("Analisando telemetria de CPU, GPU, VRAM e temperaturas...")
-        self.lbl_bn_desc.setStyleSheet("color: #e6edf3; font-size: 14px; margin: 4px 0;")
+        self.lbl_bn_desc.setStyleSheet("color: #E0E0E0; font-size: 13.5px; line-height: 1.4;")
+        self.lbl_bn_desc.setWordWrap(True)
         bn_l.addWidget(self.lbl_bn_desc)
 
         self.lbl_bn_advice = QLabel("Dica: Inicie um jogo para verificar se há limitações de hardware.")
-        self.lbl_bn_advice.setStyleSheet("color: #8b949e; font-size: 12px; background: #0d1117; padding: 10px; border-radius: 6px; border: 1px solid #21262d;")
+        self.lbl_bn_advice.setStyleSheet("color: #8C8C8C; font-size: 12px; background: #060606; padding: 12px; border-radius: 8px; border: 1px solid #1C1C1C;")
         self.lbl_bn_advice.setWordWrap(True)
         bn_l.addWidget(self.lbl_bn_advice)
 
@@ -52,20 +54,24 @@ class GamesView(QWidget):
         opts_card = QFrame()
         opts_card.setProperty("class", "Card")
         ol = QVBoxLayout(opts_card)
+        ol.setSpacing(10)
 
-        otitle = QLabel("Otimizador de Inicialização de Jogos (Linux & CachyOS)")
-        otitle.setStyleSheet("font-size: 14px; font-weight: bold; color: #e6edf3;")
+        otitle = QLabel("OTIMIZADOR DE INICIALIZAÇÃO DE JOGOS")
+        otitle.setStyleSheet("font-size: 12px; font-weight: 700; color: #737373; text-transform: uppercase;")
         ol.addWidget(otitle)
 
         toggles_l = QHBoxLayout()
-        self.chk_mangohud = QCheckBox("Ativar MangoHud (Overlay de FPS & Sensores)")
+        self.chk_mangohud = QCheckBox("MangoHud (Overlay de FPS & Sensores)")
         self.chk_mangohud.setChecked(True)
+        self.chk_mangohud.setStyleSheet("color: #E0E0E0; font-size: 13px;")
 
-        self.chk_gamemode = QCheckBox("Ativar GameMode (gamemoderun)")
+        self.chk_gamemode = QCheckBox("Feral GameMode")
         self.chk_gamemode.setChecked(False)
+        self.chk_gamemode.setStyleSheet("color: #E0E0E0; font-size: 13px;")
 
-        self.chk_gamescope = QCheckBox("Ativar Gamescope (Upscaling / Resolução Isolada)")
+        self.chk_gamescope = QCheckBox("Gamescope (Upscaling)")
         self.chk_gamescope.setChecked(False)
+        self.chk_gamescope.setStyleSheet("color: #E0E0E0; font-size: 13px;")
 
         self.combo_gamescope_res = QComboBox()
         self.combo_gamescope_res.addItems(["1920x1080", "2560x1440", "1280x720"])
@@ -83,14 +89,15 @@ class GamesView(QWidget):
         lib_card = QFrame()
         lib_card.setProperty("class", "Card")
         ll = QVBoxLayout(lib_card)
+        ll.setSpacing(12)
 
         lh_layout = QHBoxLayout()
-        lh_title = QLabel("Biblioteca de Jogos Instalados (Steam & Nativos)")
-        lh_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #e6edf3;")
+        lh_title = QLabel("BIBLIOTECA DE JOGOS INSTALADOS")
+        lh_title.setStyleSheet("font-size: 12px; font-weight: 700; color: #737373; text-transform: uppercase;")
         lh_layout.addWidget(lh_title)
         lh_layout.addStretch()
 
-        self.btn_refresh_games = QPushButton("Escanear Jogos")
+        self.btn_refresh_games = QPushButton("Escanear")
         self.btn_refresh_games.clicked.connect(self._scan_games)
         lh_layout.addWidget(self.btn_refresh_games)
 
@@ -131,18 +138,18 @@ class GamesView(QWidget):
     def _update_bottleneck(self):
         snap = self.monitor.get_snapshot()
         res = analyze_bottleneck(snap)
-        self.lbl_bn_title.setText(f"Detector de Gargalo: {res.title}")
+        self.lbl_bn_title.setText(f"DETECTOR DE GARGALO: {res.title.upper()}")
         self.lbl_bn_desc.setText(res.description)
         self.lbl_bn_advice.setText(f"Recomendação CachyPulse: {res.advice}")
 
         if res.severity == "critical":
-            self.lbl_bn_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #da3633;")
+            self.lbl_bn_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #DC2626;")
         elif res.severity == "warning":
-            self.lbl_bn_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #f0883e;")
+            self.lbl_bn_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #F59E0B;")
         elif res.severity == "good":
-            self.lbl_bn_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #3fb950;")
+            self.lbl_bn_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #10B981;")
         else:
-            self.lbl_bn_title.setStyleSheet("font-size: 16px; font-weight: bold; color: #58a6ff;")
+            self.lbl_bn_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #FFFFFF;")
 
     def _scan_games(self):
         games = self.game_lib.scan_steam_games()
@@ -151,8 +158,10 @@ class GamesView(QWidget):
             item_name = QTableWidgetItem(g["name"])
             item_name.setData(Qt.ItemDataRole.UserRole, g["id"])
             item_plat = QTableWidgetItem(g["platform"])
+            item_plat.setForeground(Qt.GlobalColor.gray)
             item_size = QTableWidgetItem(f"{g['size_gb']} GB")
             item_size.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item_size.setForeground(Qt.GlobalColor.white)
 
             self.game_table.setItem(i, 0, item_name)
             self.game_table.setItem(i, 1, item_plat)

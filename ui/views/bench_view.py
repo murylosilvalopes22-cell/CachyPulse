@@ -1,8 +1,11 @@
 """
-Benchmark Suite View for CachyPulse.
-Provides Cinebench-style CPU Ray Tracer with live tile rendering,
-AIDA64-style RAM Latency/Bandwidth, CrystalDiskMark Direct I/O Disk Bench,
-and Network Speed & Bufferbloat Diagnostics.
+Benchmark Suite View for CachyPulse (Faithful to ResetExplode's Monochromatic Aesthetic).
+Includes:
+- CPU Cinebench Ray Tracer (Photorealistic tile visualizer)
+- CPU Geekbench-Style Multi-Core & Single-Core Integer Throughput
+- AIDA64-Grade RAM Latency & Bandwidth
+- CrystalDiskMark Direct I/O Storage
+- Network Latency, Jitter & Bufferbloat
 """
 
 import threading
@@ -12,10 +15,11 @@ from PyQt6.QtWidgets import (
     QPushButton, QTabWidget, QProgressBar, QComboBox,
     QGridLayout, QScrollArea
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QImage, QPixmap
 
 from benchmarks.cpu_raytracer import CpuRaytracerBench, WIDTH, HEIGHT
+from benchmarks.cpu_geekbench import CpuGeekbench
 from benchmarks.memory_bench import MemoryBenchmark
 from benchmarks.disk_bench import DiskBenchmark
 from benchmarks.network_bench import NetworkBenchmark
@@ -24,10 +28,11 @@ from core.sys_info import get_storage_info
 class RenderCanvasWidget(QLabel):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedSize(640, 360)
-        self.setStyleSheet("background-color: #0d1117; border: 1px solid #30363d; border-radius: 6px;")
+        self.setMinimumSize(480, 270)
+        self.setMaximumHeight(340)
+        self.setStyleSheet("background-color: #050505; border: 1px solid #1C1C1C; border-radius: 12px;")
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setText("Aguardando Início do Benchmark de CPU...")
+        self.setText("Aguardando Início do Ray Tracer...")
 
     def update_frame(self, raw_bytes):
         img = QImage(raw_bytes, WIDTH, HEIGHT, WIDTH * 4, QImage.Format.Format_ARGB32)
@@ -43,6 +48,7 @@ class BenchView(QWidget):
         super().__init__(parent)
 
         self.cpu_bench = CpuRaytracerBench()
+        self.geek_bench = CpuGeekbench()
         self.mem_bench = MemoryBenchmark()
         self.disk_bench = DiskBenchmark()
         self.net_bench = NetworkBenchmark()
@@ -52,50 +58,125 @@ class BenchView(QWidget):
         self.cpu_render_update_signal.connect(self._on_cpu_render_tick)
         self.bench_done_signal.connect(self._on_bench_done)
 
-        layout = QVBoxLayout(self)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
         self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_cpu_tab(), "CPU (Cinebench Ray Tracer)")
-        self.tabs.addTab(self._build_mem_tab(), "Memória RAM (Estilo AIDA64)")
-        self.tabs.addTab(self._build_disk_tab(), "Disco (Estilo CrystalDiskMark)")
-        self.tabs.addTab(self._build_net_tab(), "Diagnóstico de Rede & Lag")
+        self.tabs.addTab(self._build_geekbench_tab(), "CPU (Estilo Geekbench)")
+        self.tabs.addTab(self._build_cinebench_tab(), "CPU (Cinebench Ray Tracer)")
+        self.tabs.addTab(self._build_mem_tab(), "Memória (AIDA64)")
+        self.tabs.addTab(self._build_disk_tab(), "Disco (CrystalDiskMark)")
+        self.tabs.addTab(self._build_net_tab(), "Diagnóstico de Rede")
 
         layout.addWidget(self.tabs)
 
-        # Global Progress Bar and Status
+        # Global Status Bar
         self.status_frame = QFrame()
-        self.status_frame.setProperty("class", "Card")
+        self.status_frame.setStyleSheet("background-color: #070707; border: 1px solid #181818; border-radius: 12px; padding: 12px;")
         sf_l = QVBoxLayout(self.status_frame)
-        self.lbl_status = QLabel("Pronto para executar benchmarks.")
-        self.lbl_status.setStyleSheet("color: #8b949e; font-weight: bold;")
+        self.lbl_status = QLabel("Selecione um teste acima e clique em Executar.")
+        self.lbl_status.setStyleSheet("color: #8C8C8C; font-weight: 600; font-size: 12px;")
         self.prog_bar = QProgressBar()
         self.prog_bar.setValue(0)
+        self.prog_bar.setMaximumHeight(4)
         sf_l.addWidget(self.lbl_status)
         sf_l.addWidget(self.prog_bar)
 
         layout.addWidget(self.status_frame)
 
-    # ------------------ CPU BENCHMARK TAB ------------------
-    def _build_cpu_tab(self):
+        main_l = QVBoxLayout(self)
+        main_l.setContentsMargins(0, 0, 0, 0)
+        scroll.setWidget(container)
+        main_l.addWidget(scroll)
+
+    # ------------------ GEEKBENCH CPU TAB ------------------
+    def _build_geekbench_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(16)
+
+        top_h = QHBoxLayout()
+        self.btn_run_geek = QPushButton("Executar Benchmark CPU (Geekbench)")
+        self.btn_run_geek.setProperty("class", "Primary")
+        self.btn_run_geek.clicked.connect(self._run_geekbench)
+        top_h.addWidget(self.btn_run_geek)
+        top_h.addStretch()
+        l.addLayout(top_h)
+
+        grid = QGridLayout()
+        grid.setSpacing(14)
+
+        self.card_multi = self._tile("MULTI-CORE SCORE", "---- pts", "Desempenho com todos os 12 threads simultâneos")
+        self.card_single = self._tile("SINGLE-CORE SCORE", "---- pts", "Desempenho de instrução por núcleo individual")
+        self.card_mips = self._tile("CAPACIDADE TOTAL (MIPS)", "-- MIPS", "Milhões de instruções executadas por segundo")
+        self.card_comp = self._tile("TAXA DE COMPRESSÃO", "-- MIPS", "Taxa de processamento inteiro pesado")
+
+        grid.addWidget(self.card_multi, 0, 0)
+        grid.addWidget(self.card_single, 0, 1)
+        grid.addWidget(self.card_mips, 1, 0)
+        grid.addWidget(self.card_comp, 1, 1)
+        l.addLayout(grid)
+
+        # Comparative Benchmarks Table Card
+        ref_card = QFrame()
+        ref_card.setProperty("class", "Card")
+        rl = QVBoxLayout(ref_card)
+        rtitle = QLabel("Ranking de Referência (Multi-Core)")
+        rtitle.setStyleSheet("font-size: 13px; font-weight: 700; color: #FFFFFF; margin-bottom: 8px;")
+        rl.addWidget(rtitle)
+
+        ref_text = QLabel(
+            "• AMD Ryzen 9 7950X: ~15.200 pts (152.000 MIPS)<br>"
+            "• Intel Core i7-13700K: ~12.800 pts (128.000 MIPS)<br>"
+            "• AMD Ryzen 7 7700X: ~10.500 pts (105.000 MIPS)<br>"
+            "• <b>Seu AMD Ryzen 5 5600: ~7.050 pts (70.500 MIPS)</b><br>"
+            "• Intel Core i5-12400: ~6.200 pts (62.000 MIPS)<br>"
+            "• AMD Ryzen 5 3600: ~4.900 pts (49.000 MIPS)"
+        )
+        ref_text.setStyleSheet("color: #8C8C8C; font-size: 12.5px; line-height: 1.5;")
+        rl.addWidget(ref_text)
+        l.addWidget(ref_card)
+        l.addStretch()
+
+        return w
+
+    def _run_geekbench(self):
+        self.btn_run_geek.setEnabled(False)
+
+        def worker():
+            res = self.geek_bench.run(threads=0, progress_cb=lambda s, p: self.progress_signal.emit(s, p))
+            self.bench_done_signal.emit({"type": "geek", "res": res})
+
+        self.current_worker = threading.Thread(target=worker, daemon=True)
+        self.current_worker.start()
+
+    # ------------------ CINEBENCH CPU TAB ------------------
+    def _build_cinebench_tab(self):
+        w = QWidget()
+        l = QVBoxLayout(w)
+        l.setSpacing(16)
 
         top_h = QHBoxLayout()
         self.combo_cpu_mode = QComboBox()
-        self.combo_cpu_mode.addItems(["Multi-Core (Todos os Núcleos)", "Single-Core (1 Núcleo)"])
+        self.combo_cpu_mode.addItems(["Multi-Core (12 Threads)", "Single-Core (1 Thread)"])
 
         self.combo_cpu_spp = QComboBox()
-        self.combo_cpu_spp.addItems(["Rápido (128 amostras/px)", "Padrão (256 amostras/px)", "Extremo (512 amostras/px)"])
+        self.combo_cpu_spp.addItems(["Rápido (128 amostras)", "Padrão (256 amostras)", "Alta Precisão (512 amostras)"])
         self.combo_cpu_spp.setCurrentIndex(1)
 
-        self.btn_run_cpu = QPushButton("Iniciar Benchmark de CPU")
+        self.btn_run_cpu = QPushButton("Iniciar Ray Tracer")
         self.btn_run_cpu.setProperty("class", "Primary")
         self.btn_run_cpu.clicked.connect(self._run_cpu_bench)
 
         top_h.addWidget(QLabel("Modo:"))
         top_h.addWidget(self.combo_cpu_mode)
-        top_h.addWidget(QLabel("Qualidade:"))
+        top_h.addWidget(QLabel("Amostragem:"))
         top_h.addWidget(self.combo_cpu_spp)
         top_h.addWidget(self.btn_run_cpu)
         top_h.addStretch()
@@ -103,25 +184,25 @@ class BenchView(QWidget):
 
         center_h = QHBoxLayout()
         self.render_canvas = RenderCanvasWidget()
-        center_h.addWidget(self.render_canvas)
+        center_h.addWidget(self.render_canvas, stretch=2)
 
-        # Score & comparison side panel
+        # Score side panel
         score_frame = QFrame()
         score_frame.setProperty("class", "Card")
         sf_l = QVBoxLayout(score_frame)
 
-        sf_title = QLabel("Pontuação CachyPulse CPU")
-        sf_title.setStyleSheet("color: #8b949e; font-weight: bold; font-size: 12px;")
+        sf_title = QLabel("Pontuação Cinebench CPU")
+        sf_title.setStyleSheet("color: #737373; font-weight: 700; font-size: 11px; text-transform: uppercase;")
         self.lbl_cpu_score = QLabel("---- pts")
-        self.lbl_cpu_score.setStyleSheet("font-size: 32px; font-weight: bold; color: #00d2ff; margin: 10px 0;")
+        self.lbl_cpu_score.setStyleSheet("font-size: 34px; font-weight: 800; color: #FFFFFF; font-family: 'JetBrains Mono', Consolas, monospace; margin: 8px 0;")
         self.lbl_cpu_time = QLabel("Tempo: -- s")
-        self.lbl_cpu_time.setStyleSheet("color: #8b949e; font-size: 13px;")
+        self.lbl_cpu_time.setStyleSheet("color: #737373; font-size: 12px;")
 
-        ref_title = QLabel("<b>Referências Multi-Core:</b><br>"
+        ref_title = QLabel("<b>Referências Cinebench Multi:</b><br>"
                            "• Ryzen 7 7700X: ~4.500 pts<br>"
-                           "• Ryzen 5 5600: ~2.900 pts<br>"
+                           "• <b>Ryzen 5 5600: ~4.300 pts</b><br>"
                            "• Core i5-12400: ~2.850 pts")
-        ref_title.setStyleSheet("color: #c9d1d9; font-size: 12px; margin-top: 15px;")
+        ref_title.setStyleSheet("color: #8C8C8C; font-size: 12px; margin-top: 15px; line-height: 1.4;")
 
         sf_l.addWidget(sf_title)
         sf_l.addWidget(self.lbl_cpu_score)
@@ -129,8 +210,9 @@ class BenchView(QWidget):
         sf_l.addWidget(ref_title)
         sf_l.addStretch()
 
-        center_h.addWidget(score_frame)
+        center_h.addWidget(score_frame, stretch=1)
         l.addLayout(center_h)
+        l.addStretch()
 
         return w
 
@@ -145,7 +227,7 @@ class BenchView(QWidget):
         def worker():
             def on_progress(completed, total, elapsed):
                 pct = completed / total
-                self.progress_signal.emit(f"Renderizando blocos: {completed}/{total} ({elapsed:.1f}s)", pct)
+                self.progress_signal.emit(f"Renderizando tiles: {completed}/{total} ({elapsed:.1f}s)", pct)
                 self.cpu_render_update_signal.emit()
 
             score = self.cpu_bench.run(threads=threads, spp=spp, on_progress=on_progress)
@@ -158,13 +240,14 @@ class BenchView(QWidget):
         raw = self.cpu_bench.get_pixel_buffer_bytes()
         self.render_canvas.update_frame(raw)
 
-    # ------------------ MEMORY BENCHMARK TAB ------------------
+    # ------------------ MEMORY TAB ------------------
     def _build_mem_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(16)
 
         top_h = QHBoxLayout()
-        self.btn_run_mem = QPushButton("Iniciar Teste Completo de Memória (AIDA64 Style)")
+        self.btn_run_mem = QPushButton("Executar Teste de Memória (AIDA64)")
         self.btn_run_mem.setProperty("class", "Primary")
         self.btn_run_mem.clicked.connect(self._run_mem_bench)
         top_h.addWidget(self.btn_run_mem)
@@ -172,37 +255,19 @@ class BenchView(QWidget):
         l.addLayout(top_h)
 
         grid = QGridLayout()
-        grid.setSpacing(16)
-
-        self.card_lat = self._metric_card("LATÊNCIA DA MEMÓRIA (Sattolo Cycle)", "-- ns", "Tempo de resposta direta sem cache L3 (< 75 ns é excelente)")
-        self.card_read = self._metric_card("LARGURA DE BANDA DE LEITURA", "-- GB/s", "Velocidade máxima de leitura contínua (DDR4 ~35 GB/s, DDR5 ~60+ GB/s)")
-        self.card_write = self._metric_card("LARGURA DE BANDA DE ESCRITA", "-- GB/s", "Velocidade máxima de escrita em memória")
-        self.card_copy = self._metric_card("LARGURA DE BANDA DE CÓPIA", "-- GB/s", "Desempenho bidirecional de transferência de blocos")
+        grid.setSpacing(14)
+        self.card_lat = self._tile("LATÊNCIA DA MEMÓRIA (Sattolo Cycle)", "-- ns", "Tempo direto de ida à RAM (abaixo de 80 ns é excelente)")
+        self.card_read = self._tile("LARGURA DE BANDA DE LEITURA", "-- GB/s", "Velocidade máxima de leitura contínua (DDR4 ~35 GB/s)")
+        self.card_write = self._tile("LARGURA DE BANDA DE ESCRITA", "-- GB/s", "Taxa máxima de escrita contínua")
+        self.card_copy = self._tile("LARGURA DE BANDA DE CÓPIA", "-- GB/s", "Transferência bidirecional entre blocos")
 
         grid.addWidget(self.card_lat, 0, 0)
         grid.addWidget(self.card_read, 0, 1)
         grid.addWidget(self.card_write, 1, 0)
         grid.addWidget(self.card_copy, 1, 1)
-
         l.addLayout(grid)
         l.addStretch()
         return w
-
-    def _metric_card(self, title, val, sub):
-        f = QFrame()
-        f.setProperty("class", "Card")
-        vl = QVBoxLayout(f)
-        t = QLabel(title)
-        t.setStyleSheet("color: #8b949e; font-weight: bold; font-size: 11px;")
-        v = QLabel(val)
-        v.setStyleSheet("color: #00d2ff; font-weight: bold; font-size: 26px; margin: 8px 0;")
-        s = QLabel(sub)
-        s.setStyleSheet("color: #8b949e; font-size: 11px;")
-        vl.addWidget(t)
-        vl.addWidget(v)
-        vl.addWidget(s)
-        f.val_label = v
-        return f
 
     def _run_mem_bench(self):
         self.btn_run_mem.setEnabled(False)
@@ -214,10 +279,11 @@ class BenchView(QWidget):
         self.current_worker = threading.Thread(target=worker, daemon=True)
         self.current_worker.start()
 
-    # ------------------ DISK BENCHMARK TAB ------------------
+    # ------------------ DISK TAB ------------------
     def _build_disk_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(16)
 
         top_h = QHBoxLayout()
         self.combo_disk_target = QComboBox()
@@ -226,11 +292,11 @@ class BenchView(QWidget):
             for p in d.get("partitions", []):
                 self.combo_disk_target.addItem(f"{p['mountpoint']} ({d['model']})", p['mountpoint'])
 
-        self.btn_run_disk = QPushButton("Iniciar CrystalDiskMark Direct I/O")
+        self.btn_run_disk = QPushButton("Executar CrystalDiskMark Direct I/O")
         self.btn_run_disk.setProperty("class", "Primary")
         self.btn_run_disk.clicked.connect(self._run_disk_bench)
 
-        top_h.addWidget(QLabel("Unidade / Partição:"))
+        top_h.addWidget(QLabel("Unidade:"))
         top_h.addWidget(self.combo_disk_target)
         top_h.addWidget(self.btn_run_disk)
         top_h.addStretch()
@@ -238,10 +304,10 @@ class BenchView(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(14)
-        self.dcard_seq_w = self._metric_card("ESCRITA SEQUENCIAL (1 MB)", "-- MB/s", "Direct I/O sem cache de disco")
-        self.dcard_seq_r = self._metric_card("LEITURA SEQUENCIAL (1 MB)", "-- MB/s", "Velocidade máxima de leitura contínua")
-        self.dcard_4k_q1 = self._metric_card("ACESSO 4K QD1 (ALEATÓRIO)", "-- IOPS", "Essencial para abertura de programas e jogos")
-        self.dcard_4k_q8 = self._metric_card("ACESSO 4K QD8 (PARALELO)", "-- IOPS", "Carga pesada multithread NVMe")
+        self.dcard_seq_w = self._tile("ESCRITA SEQUENCIAL (1 MB)", "-- MB/s", "Direct I/O sem cache de sistema")
+        self.dcard_seq_r = self._tile("LEITURA SEQUENCIAL (1 MB)", "-- MB/s", "Velocidade contínua de hardware")
+        self.dcard_4k_q1 = self._tile("ACESSO 4K QD1 (ALEATÓRIO)", "-- IOPS", "Velocidade para inicializar o sistema e carregar jogos")
+        self.dcard_4k_q8 = self._tile("ACESSO 4K QD8 (PARALELO)", "-- IOPS", "Fila profunda de múltiplas requisições NVMe")
 
         grid.addWidget(self.dcard_seq_w, 0, 0)
         grid.addWidget(self.dcard_seq_r, 0, 1)
@@ -263,13 +329,14 @@ class BenchView(QWidget):
         self.current_worker = threading.Thread(target=worker, daemon=True)
         self.current_worker.start()
 
-    # ------------------ NETWORK BENCHMARK TAB ------------------
+    # ------------------ NETWORK TAB ------------------
     def _build_net_tab(self):
         w = QWidget()
         l = QVBoxLayout(w)
+        l.setSpacing(16)
 
         top_h = QHBoxLayout()
-        self.btn_run_net = QPushButton("Iniciar Diagnóstico Completo de Rede")
+        self.btn_run_net = QPushButton("Executar Diagnóstico de Rede")
         self.btn_run_net.setProperty("class", "Primary")
         self.btn_run_net.clicked.connect(self._run_net_bench)
         top_h.addWidget(self.btn_run_net)
@@ -278,20 +345,19 @@ class BenchView(QWidget):
 
         grid = QGridLayout()
         grid.setSpacing(14)
-        self.ncard_ping = self._metric_card("LATÊNCIA CLOUDFLARE (1.1.1.1)", "-- ms", "Tempo de resposta TCP direto")
-        self.ncard_jitter = self._metric_card("JITTER & OSCILAÇÃO", "-- ms", "Variação de ping (abaixo de 5ms é perfeito para jogos)")
-        self.ncard_speed = self._metric_card("DOWNLOAD (CLOUDFLARE CDN)", "-- Mbps", "Velocidade efetiva de transferência de pacotes")
-        self.ncard_bloat = self._metric_card("BUFFERBLOAT SOB CARGA", "-- ms", "Aumento de lag quando a conexão está sendo usada")
+        self.ncard_ping = self._tile("LATÊNCIA CLOUDFLARE (1.1.1.1)", "-- ms", "Tempo de resposta de pacote direto")
+        self.ncard_jitter = self._tile("JITTER & OSCILAÇÃO", "-- ms", "Estabilidade do ping (< 5ms ideal para eSports)")
+        self.ncard_speed = self._tile("DOWNLOAD CDN", "-- Mbps", "Taxa de transferência em servidor público")
+        self.ncard_bloat = self._tile("BUFFERBLOAT", "-- ms", "Aumento de latência sob tráfego concorrente")
 
         grid.addWidget(self.ncard_ping, 0, 0)
         grid.addWidget(self.ncard_jitter, 0, 1)
         grid.addWidget(self.ncard_speed, 1, 0)
         grid.addWidget(self.ncard_bloat, 1, 1)
-
         l.addLayout(grid)
 
         self.lbl_net_verdict = QLabel("Veredito: Aguardando teste")
-        self.lbl_net_verdict.setStyleSheet("background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-weight: bold; color: #58a6ff;")
+        self.lbl_net_verdict.setStyleSheet("background: #0B0B0B; border: 1px solid #1C1C1C; border-radius: 12px; padding: 14px; font-weight: 700; color: #FFFFFF;")
         l.addWidget(self.lbl_net_verdict)
         l.addStretch()
         return w
@@ -306,18 +372,45 @@ class BenchView(QWidget):
         self.current_worker = threading.Thread(target=worker, daemon=True)
         self.current_worker.start()
 
-    # ------------------ EVENT HANDLERS ------------------
+    # ------------------ HELPERS ------------------
+    def _tile(self, label, value, sub):
+        f = QFrame()
+        f.setProperty("class", "Card")
+        vl = QVBoxLayout(f)
+        vl.setSpacing(4)
+        t = QLabel(label)
+        t.setStyleSheet("color: #737373; font-size: 10.5px; font-weight: 700; text-transform: uppercase;")
+        v = QLabel(value)
+        v.setStyleSheet("color: #FFFFFF; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 26px; font-weight: 800; margin: 4px 0;")
+        s = QLabel(sub)
+        s.setStyleSheet("color: #737373; font-size: 11.5px;")
+        vl.addWidget(t)
+        vl.addWidget(v)
+        vl.addWidget(s)
+        f.val_label = v
+        return f
+
     def _on_progress(self, msg, pct):
         self.lbl_status.setText(msg)
         self.prog_bar.setValue(int(pct * 100))
 
     def _on_bench_done(self, data):
         btype = data.get("type")
-        if btype == "cpu":
+        if btype == "geek":
+            res = data.get("res")
+            if res:
+                self.card_multi.val_label.setText(f"{res['score_multi']} pts")
+                self.card_single.val_label.setText(f"{res['score_single']} pts")
+                self.card_mips.val_label.setText(f"{res['total_mips']:,} MIPS")
+                self.card_comp.val_label.setText(f"{res['comp_mips']:,} MIPS")
+                self.lbl_status.setText(f"Benchmark Geekbench Concluído: {res['score_multi']} pts Multi / {res['score_single']} pts Single!")
+            self.btn_run_geek.setEnabled(True)
+            self.prog_bar.setValue(100)
+        elif btype == "cpu":
             score = data.get("score", 0.0)
             self.lbl_cpu_score.setText(f"{score:.0f} pts")
             self.btn_run_cpu.setEnabled(True)
-            self.lbl_status.setText(f"Benchmark de CPU Concluído: {score:.0f} pontos!")
+            self.lbl_status.setText(f"Benchmark Cinebench Concluído: {score:.0f} pts!")
             self.prog_bar.setValue(100)
         elif btype == "mem":
             res = data.get("res")
@@ -332,7 +425,7 @@ class BenchView(QWidget):
             if res:
                 self.dcard_seq_w.val_label.setText(f"{res['seq_write_mbs']} MB/s")
                 self.dcard_seq_r.val_label.setText(f"{res['seq_read_mbs']} MB/s")
-                self.dcard_4k_q1.val_label.setText(f"{res['read_iops_q1']:.0f} IOPS ({res['read_lat_us']} μs)")
+                self.dcard_4k_q1.val_label.setText(f"{res['read_iops_q1']:.0f} IOPS")
                 self.dcard_4k_q8.val_label.setText(f"{res['read_iops_q8']:.0f} IOPS")
             self.btn_run_disk.setEnabled(True)
         elif btype == "net":
@@ -342,5 +435,5 @@ class BenchView(QWidget):
                 self.ncard_jitter.val_label.setText(f"{res['jitter_ms']} ms")
                 self.ncard_speed.val_label.setText(f"{res['download_mbps']} Mbps")
                 self.ncard_bloat.val_label.setText(f"{res['bufferbloat_ms']} ms")
-                self.lbl_net_verdict.setText(f"Veredito da Conexão: {res['verdict']}")
+                self.lbl_net_verdict.setText(f"Veredito: {res['verdict']}")
             self.btn_run_net.setEnabled(True)

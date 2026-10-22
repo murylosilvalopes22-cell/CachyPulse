@@ -1,20 +1,27 @@
 """
-Theme manager and QSS stylesheets for CachyPulse.
-Provides Dark and Light modern dashboard styling.
+CachyPulse Theme — Faithful to ResetExplode's Monochromatic & Neon Aesthetic.
+Deep OLED blacks (#000000, #080808, #0E0E0E), 16px smooth rounded cards,
+monospace metrics, and crisp white/cyan typography.
 """
 
 DARK_THEME_QSS = """
-QMainWindow, QDialog, QWidget {
-    background-color: #0d1117;
-    color: #e6edf3;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+/* ===== Base Window & Backgrounds ===== */
+QMainWindow, QDialog {
+    background-color: #000000;
+    color: #F5F5F5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", "Inter", Roboto, sans-serif;
     font-size: 13px;
 }
 
-/* Sidebar navigation */
+QWidget {
+    background-color: transparent;
+    color: #F5F5F5;
+}
+
+/* ===== Sidebar Navigation ===== */
 QFrame#Sidebar {
-    background-color: #161b22;
-    border-right: 1px solid #30363d;
+    background-color: #070707;
+    border-right: 1px solid #181818;
 }
 
 QListWidget#NavList {
@@ -24,227 +31,279 @@ QListWidget#NavList {
 }
 
 QListWidget#NavList::item {
-    height: 42px;
-    padding-left: 12px;
-    border-radius: 6px;
+    height: 44px;
+    padding-left: 14px;
+    border-radius: 12px;
     margin: 2px 8px;
-    color: #8b949e;
+    color: #8C8C8C;
+    font-size: 13.5px;
     font-weight: 500;
 }
 
 QListWidget#NavList::item:hover {
-    background-color: #21262d;
-    color: #f0f6fc;
+    background-color: #141414;
+    color: #FFFFFF;
 }
 
 QListWidget#NavList::item:selected {
-    background-color: #1f6feb;
-    color: #ffffff;
+    background-color: #1A1A1A;
+    color: #FFFFFF;
     font-weight: 600;
+    border: 1px solid #282828;
 }
 
-/* Cards */
+/* ===== Cards (ResetExplode 16px CardBorder) ===== */
 QFrame.Card {
-    background-color: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 8px;
-    padding: 16px;
+    background-color: #0B0B0B;
+    border: 1px solid #1C1C1C;
+    border-radius: 16px;
+    padding: 18px;
 }
 
 QFrame.Card:hover {
-    border: 1px solid #58a6ff;
+    border: 1px solid #2C2C2C;
 }
 
-/* Buttons */
+/* ===== Typography Labels ===== */
+QLabel.CardTitle {
+    color: #8C8C8C;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+QLabel.BigNumber {
+    color: #FFFFFF;
+    font-family: "JetBrains Mono", "Cascadia Mono", "Consolas", monospace;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 4px 0;
+}
+
+QLabel.SubText {
+    color: #707070;
+    font-size: 12px;
+}
+
+/* ===== Buttons (ResetExplode Primary White Pill) ===== */
 QPushButton {
-    background-color: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 8px 16px;
+    background-color: #161616;
+    color: #F0F0F0;
+    border: 1px solid #262626;
+    border-radius: 10px;
+    padding: 9px 20px;
     font-weight: 600;
+    font-size: 13px;
 }
 
 QPushButton:hover {
-    background-color: #30363d;
-    border-color: #8b949e;
-    color: #ffffff;
+    background-color: #222222;
+    border-color: #404040;
+    color: #FFFFFF;
 }
 
 QPushButton:pressed {
-    background-color: #161b22;
+    background-color: #0E0E0E;
 }
 
 QPushButton.Primary {
-    background-color: #238636;
-    border-color: #2ea043;
-    color: #ffffff;
+    background-color: #FFFFFF;
+    color: #000000;
+    border: 1px solid #FFFFFF;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-weight: 700;
 }
 
 QPushButton.Primary:hover {
-    background-color: #2ea043;
+    background-color: #E2E2E2;
+    color: #000000;
+}
+
+QPushButton.Primary:pressed {
+    background-color: #CCCCCC;
 }
 
 QPushButton.Danger {
-    background-color: #da3633;
-    border-color: #f85149;
-    color: #ffffff;
+    background-color: #B91C1C;
+    color: #FFFFFF;
+    border: 1px solid #DC2626;
+    border-radius: 10px;
 }
 
 QPushButton.Danger:hover {
-    background-color: #b62324;
+    background-color: #DC2626;
 }
 
-/* Tables */
+/* ===== Tabs (Clean Minimalist TabBar) ===== */
+QTabWidget::pane {
+    border: none;
+    background-color: transparent;
+}
+
+QTabBar::tab {
+    background-color: #0D0D0D;
+    color: #8C8C8C;
+    border: 1px solid #1C1C1C;
+    border-radius: 10px;
+    padding: 8px 18px;
+    margin-right: 8px;
+    margin-bottom: 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+}
+
+QTabBar::tab:hover {
+    background-color: #161616;
+    color: #FFFFFF;
+}
+
+QTabBar::tab:selected {
+    background-color: #202020;
+    color: #FFFFFF;
+    border: 1px solid #383838;
+}
+
+/* ===== Tables (Sleek Dark Borderless Rows) ===== */
 QTableWidget {
-    background-color: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    gridline-color: #21262d;
-    color: #e6edf3;
+    background-color: #0A0A0A;
+    border: 1px solid #1C1C1C;
+    border-radius: 12px;
+    gridline-color: #141414;
+    color: #F5F5F5;
+    outline: none;
+}
+
+QTableWidget::item {
+    padding: 10px;
+    border-bottom: 1px solid #141414;
+}
+
+QTableWidget::item:selected {
+    background-color: #1E1E1E;
+    color: #FFFFFF;
 }
 
 QHeaderView::section {
-    background-color: #0d1117;
-    color: #8b949e;
-    font-weight: 600;
-    padding: 6px;
+    background-color: #060606;
+    color: #737373;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 10px;
     border: none;
-    border-bottom: 1px solid #30363d;
+    border-bottom: 1px solid #1C1C1C;
 }
 
-/* Scrollbars */
+/* ===== Inputs & Selectors ===== */
+QLineEdit, QComboBox, QSpinBox {
+    background-color: #0C0C0C;
+    border: 1px solid #242424;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #F5F5F5;
+    font-size: 13px;
+}
+
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+    border: 1px solid #4A4A4A;
+}
+
+QComboBox::drop-down {
+    border: none;
+    padding-right: 10px;
+}
+
+/* ===== Sleek 4px Meters (ResetExplode Meter style) ===== */
+QProgressBar {
+    background-color: #1A1A1A;
+    border: none;
+    border-radius: 2px;
+    height: 4px;
+    text-align: right;
+}
+
+QProgressBar::chunk {
+    background-color: #FFFFFF;
+    border-radius: 2px;
+}
+
+/* ===== Scrollbars (Ultra-thin & Dark) ===== */
+QScrollArea {
+    background-color: transparent;
+    border: none;
+}
+
 QScrollBar:vertical {
-    background: #0d1117;
-    width: 10px;
+    background: #000000;
+    width: 8px;
     margin: 0px;
 }
 
 QScrollBar::handle:vertical {
-    background: #30363d;
-    border-radius: 5px;
-    min-height: 20px;
+    background: #242424;
+    border-radius: 4px;
+    min-height: 24px;
 }
 
 QScrollBar::handle:vertical:hover {
-    background: #8b949e;
+    background: #4A4A4A;
 }
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
     height: 0px;
 }
-
-/* Inputs */
-QLineEdit, QComboBox, QSpinBox {
-    background-color: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 6px 10px;
-    color: #e6edf3;
-}
-
-QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-    border-color: #58a6ff;
-}
-
-QProgressBar {
-    background-color: #21262d;
-    border: none;
-    border-radius: 4px;
-    text-align: center;
-    color: #ffffff;
-    font-weight: bold;
-    height: 12px;
-}
-
-QProgressBar::chunk {
-    background-color: #238636;
-    border-radius: 4px;
-}
 """
 
 LIGHT_THEME_QSS = """
-QMainWindow, QDialog, QWidget {
-    background-color: #f6f8fa;
-    color: #1f2328;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+QMainWindow, QDialog {
+    background-color: #FAFAFA;
+    color: #111111;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 13px;
 }
 
-QFrame#Sidebar {
-    background-color: #ffffff;
-    border-right: 1px solid #d0d7de;
+QWidget {
+    background-color: transparent;
+    color: #111111;
 }
 
-QListWidget#NavList {
-    background-color: transparent;
-    border: none;
+QFrame#Sidebar {
+    background-color: #F0F0F0;
+    border-right: 1px solid #E0E0E0;
 }
 
 QListWidget#NavList::item {
-    height: 42px;
-    padding-left: 12px;
-    border-radius: 6px;
+    height: 44px;
+    padding-left: 14px;
+    border-radius: 12px;
     margin: 2px 8px;
-    color: #656d76;
-    font-weight: 500;
-}
-
-QListWidget#NavList::item:hover {
-    background-color: #f3f4f6;
-    color: #1f2328;
+    color: #555555;
+    font-size: 13.5px;
 }
 
 QListWidget#NavList::item:selected {
-    background-color: #0969da;
-    color: #ffffff;
+    background-color: #E0E0E0;
+    color: #000000;
     font-weight: 600;
 }
 
 QFrame.Card {
-    background-color: #ffffff;
-    border: 1px solid #d0d7de;
-    border-radius: 8px;
-    padding: 16px;
-}
-
-QPushButton {
-    background-color: #f6f8fa;
-    color: #24292f;
-    border: 1px solid #d0d7de;
-    border-radius: 6px;
-    padding: 8px 16px;
-    font-weight: 600;
-}
-
-QPushButton:hover {
-    background-color: #f3f4f6;
+    background-color: #FFFFFF;
+    border: 1px solid #E5E5E5;
+    border-radius: 16px;
+    padding: 18px;
 }
 
 QPushButton.Primary {
-    background-color: #1f883d;
-    color: #ffffff;
-    border-color: #1a7f37;
-}
-
-QPushButton.Primary:hover {
-    background-color: #1a7f37;
-}
-
-QTableWidget {
-    background-color: #ffffff;
-    border: 1px solid #d0d7de;
-    border-radius: 6px;
-    gridline-color: #f0f2f5;
-    color: #1f2328;
-}
-
-QHeaderView::section {
-    background-color: #f6f8fa;
-    color: #656d76;
-    font-weight: 600;
-    padding: 6px;
-    border: none;
-    border-bottom: 1px solid #d0d7de;
+    background-color: #000000;
+    color: #FFFFFF;
+    border: 1px solid #000000;
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-weight: 700;
 }
 """

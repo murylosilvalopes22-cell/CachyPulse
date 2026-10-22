@@ -1,5 +1,5 @@
 """
-Detailed System Specs View for CachyPulse.
+Detailed System Specs View for CachyPulse (Faithful to ResetExplode's Monochromatic Aesthetic).
 Displays Motherboard/BIOS, CPU architectural specs, GPU-Z style GPU specs,
 RAM/ZRAM details, and Report Exporting.
 """
@@ -29,8 +29,8 @@ class SystemView(QWidget):
 
         # Header with Export Buttons
         header_layout = QHBoxLayout()
-        title = QLabel("Especificações Detalhadas do Hardware")
-        title.setStyleSheet("font-size: 18px; font-weight: bold; color: #58a6ff;")
+        title = QLabel("Especificações do Sistema & Hardware")
+        title.setStyleSheet("font-size: 16px; font-weight: 700; color: #FFFFFF;")
         header_layout.addWidget(title)
         header_layout.addStretch()
 
@@ -57,7 +57,7 @@ class SystemView(QWidget):
             ("Modelo da Placa", mb["board_name"]),
             ("Versão da BIOS", mb["bios_version"]),
             ("Data da BIOS", mb["bios_date"]),
-            ("Formato do Chassi", mb["chassis"])
+            ("Chassi", mb["chassis"])
         ])
         layout.addWidget(card_mb)
 
@@ -65,8 +65,8 @@ class SystemView(QWidget):
         card_cpu = self._create_card("Processador (CPU)", [
             ("Nome do Modelo", cpu["model"]),
             ("Arquitetura", cpu["arch"]),
-            ("Núcleos Físicos / Lógicos", f"{cpu['cores']} Cores / {cpu['threads']} Threads"),
-            ("Governador de Escala", cpu["governor"]),
+            ("Núcleos / Threads", f"{cpu['cores']}C / {cpu['threads']}T"),
+            ("Governador Ativo", cpu["governor"]),
             ("Cache L1 (Dados/Instruções)", f"{cpu['l1d']} / {cpu['l1i']}"),
             ("Cache L2", cpu["l2"]),
             ("Cache L3 Compartilhado", cpu["l3"]),
@@ -81,16 +81,16 @@ class SystemView(QWidget):
             ("Processo de Fabricação", gpu["process"]),
             ("Shaders / CUDA Cores", str(gpu["shaders"])),
             ("ROPs / TMUs", f"{gpu['rops']} / {gpu['tmus']}"),
-            ("Tensor Cores / RT Cores", f"{gpu['tensor']} / {gpu['rt_cores']}"),
+            ("Tensor / RT Cores", f"{gpu['tensor']} / {gpu['rt_cores']}"),
             ("Memória de Vídeo (VRAM)", f"{gpu['vram_total_mb']} MB {gpu['mem_type']}"),
             ("Barramento de Memória", f"{gpu['bus_bit']} bits ({gpu['bandwidth_gbs']} GB/s)"),
-            ("Limite de Energia (TDP)", f"{gpu['tdp_w']} W"),
+            ("Consumo Térmico (TDP)", f"{gpu['tdp_w']} W"),
             ("Driver Gráfico Linux", gpu["driver"])
         ])
         layout.addWidget(card_gpu)
 
         # 4. RAM & ZRAM Card
-        card_ram = self._create_card("Memória RAM & ZRAM", [
+        card_ram = self._create_card("Memória RAM & Swap", [
             ("Capacidade Total", f"{ram['total_gb']} GB"),
             ("Memória Disponível", f"{ram['available_gb']} GB"),
             ("ZRAM Swap Ativo", f"Sim ({ram['zram_size_gb']} GB)" if ram["has_zram"] else "Não"),
@@ -110,20 +110,21 @@ class SystemView(QWidget):
         frame = QFrame()
         frame.setProperty("class", "Card")
         l = QVBoxLayout(frame)
+        l.setSpacing(10)
 
         h = QLabel(title)
-        h.setStyleSheet("font-size: 14px; font-weight: bold; color: #e6edf3; border-bottom: 1px solid #30363d; padding-bottom: 6px; margin-bottom: 10px;")
+        h.setStyleSheet("font-size: 13px; font-weight: 700; color: #FFFFFF; border-bottom: 1px solid #1C1C1C; padding-bottom: 8px; margin-bottom: 6px;")
         l.addWidget(h)
 
         grid = QGridLayout()
-        grid.setSpacing(10)
+        grid.setSpacing(12)
         for i, (k, v) in enumerate(items):
             row = i // 2
             col = (i % 2) * 2
             lbl_k = QLabel(k)
-            lbl_k.setStyleSheet("color: #8b949e; font-weight: 500;")
+            lbl_k.setStyleSheet("color: #737373; font-size: 11px; font-weight: 700; text-transform: uppercase;")
             lbl_v = QLabel(str(v))
-            lbl_v.setStyleSheet("color: #f0f6fc; font-weight: bold;")
+            lbl_v.setStyleSheet("color: #FFFFFF; font-weight: 600; font-size: 13px;")
             grid.addWidget(lbl_k, row, col)
             grid.addWidget(lbl_v, row, col + 1)
 

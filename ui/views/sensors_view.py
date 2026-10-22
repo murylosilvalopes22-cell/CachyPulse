@@ -1,5 +1,5 @@
 """
-Sensors View for CachyPulse.
+Sensors View for CachyPulse (Faithful to ResetExplode's Monochromatic Aesthetic).
 Live hardware sensor grid with category filters, real-time search,
 and continuous 1-second telemetry refresh.
 """
@@ -83,10 +83,13 @@ class SensorsView(QWidget):
 
         for i, r in enumerate(rows):
             item_cat = QTableWidgetItem(r.category)
+            item_cat.setForeground(Qt.GlobalColor.gray)
             item_name = QTableWidgetItem(r.name)
             item_val = QTableWidgetItem(str(r.value))
             item_val.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            item_val.setForeground(Qt.GlobalColor.white)
             item_unit = QTableWidgetItem(r.unit)
+            item_unit.setForeground(Qt.GlobalColor.darkGray)
 
             self.table.setItem(i, 0, item_cat)
             self.table.setItem(i, 1, item_name)
