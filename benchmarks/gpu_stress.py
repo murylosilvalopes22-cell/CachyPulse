@@ -1,14 +1,14 @@
 """
 GPU Stress Test / Authentic 3D FurMark Torus with Instanced Shells & Deep Graphics Controls for CachyPulse.
 Direct high-performance port and enhancement of ResetExplode's GpuBurn:
-- Parametric 3D Torus mesh (160 segs x 64 sides = 10,465 vertices, 61,440 indices)
-- Instanced Shell Rendering (64 to 320 concentric layers)
+- Parametric 3D Torus mesh with multi-LOD support (80x32, 120x48, 160x64)
+- Instanced Shell Rendering (24 to 192 layers)
 - Solid, non-transparent core body (Shell 0) with rich ambient lighting
 - Thick procedural hair follicle cutout with customizable density exponent
 - Glossy specular sheen and ambient occlusion along hair strands
-- Heavy FMA (Fused Multiply Add) ALU burn chains (up to 2048 iterations) to saturate 100% GPU TDP
-- Comprehensive graphics settings: Resolution, Fullscreen, MSAA, V-Sync, Fur Density, Length,
-  Color Themes, Physical Gravity, Wind Flutter, and Rotation Speed.
+- Calibrated FMA ALU burn chains to hit high framerates (60 to 300+ FPS) or 100% GPU TDP
+- Granular graphics controls: Resolution, Fullscreen, MSAA, V-Sync, Fur Density, Length,
+  LOD Geometry, Color Themes, Gravity Droop, Wind Ripple, and 3D Rotation Speed.
 """
 
 import time
@@ -16,7 +16,7 @@ import ctypes
 import numpy as np
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QComboBox, QSpinBox, QCheckBox, QFrame
+    QComboBox, QSpinBox, QCheckBox, QFrame, QGridLayout, QWidget
 )
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QSurfaceFormat, QMatrix4x4, QVector3D, QKeySequence, QShortcut
@@ -93,6 +93,7 @@ in vec3 vWorldPos;
 uniform int uIterations;
 uniform float uFurDensityExp;
 uniform int uColorTheme;
+uniform int uEnableSpecular;
 uniform float uTime;
 
 out vec4 FragColor;
@@ -107,7 +108,7 @@ void main() {
     // Dense procedural fur noise (900 x 380 grid produces 342,000 distinct hair cells)
     float h = hash(floor(vUv * vec2(900.0, 380.0)));
 
-    // Heavy FMA ALU burn loop (stresses tensor and CUDA ALUs to pull max Watts)
+    // Calibrated FMA ALU burn loop (stresses tensor and CUDA ALUs safely without collapsing FPS)
     vec4 a = vec4(h, vUv, vShell);
     vec4 b = a.wzyx + 0.5;
     for (int k = 0; k < uIterations; k++) {
@@ -135,9 +136,12 @@ void main() {
     float ao = mix(0.48, 1.0, vShell);
 
     // Specular sheen on fur tips
-    vec3 V = normalize(vec3(0.0, 1.2, 3.2) - vWorldPos);
-    vec3 H = normalize(L + V);
-    float spec = pow(max(dot(vNormal, H), 0.0), 20.0) * 0.35 * vShell;
+    float spec = 0.0;
+    if (uEnableSpecular == 1) {
+        vec3 V = normalize(vec3(0.0, 1.2, 3.2) - vWorldPos);
+        vec3 H = normalize(L + V);
+        spec = pow(max(dot(vNormal, H), 0.0), 20.0) * 0.35 * vShell;
+    }
 
     float lum = (light * ao + spec) * (0.94 + 0.06 * acc);
 
@@ -201,7 +205,6 @@ def generate_torus_geometry(seg=160, sides=64, R=1.0, r=0.42):
         for j in range(sides):
             a = i * (sides + 1) + j
             b = (i + 1) * (sides + 1) + j
-            # CCW winding outward-facing
             indices.extend([a, a + 1, b, b, a + 1, b + 1])
     inds = np.array(indices, dtype=np.uint32)
 
@@ -210,25 +213,36 @@ def generate_torus_geometry(seg=160, sides=64, R=1.0, r=0.42):
 class FurmarkWidget(QOpenGLWidget):
     stats_updated = pyqtSignal(float, float)
 
-    def __init__(self, msaa=4, vsync=False, parent=None):
+    def __init__(self, msaa=1, vsync=False, parent=None):
         super().__init__(parent)
         self.prog = None
         self.vao = 0
+        self.vbo = 0
+        self.ebo = 0
         self.num_indices = 0
         self.start_time = time.time()
         self.frame_count = 0
         self.last_time = time.time()
         self.running = True
 
-        # Stress settings
-        self.shell_count = 160
-        self.iterations = 512
+        # Geometry LOD
+        self.mesh_seg = 120
+        self.mesh_sides = 48
+
+        # Stress settings (calibrated for real GPU scalability)
+        self.shell_count = 64
+        self.iterations = 24
         self.fur_length = 0.16
-        self.fur_density_exp = 1.6 # Solid core + thick fur carpet
-        self.color_theme = 0       # 0 = Classic Gold, 1 = Lava, 2 = CachyOS, 3 = Cyberpunk, 4 = Platinum
+        self.fur_density_exp = 1.5
+        self.color_theme = 0
+        self.specular = True
         self.gravity = True
         self.wind = True
         self.rot_speed = 1.0
+
+        # Target frame limiter (0 = uncapped)
+        self.target_fps = 0
+        self.last_frame_stamp = time.time()
 
         # OpenGL Surface Format
         fmt = QSurfaceFormat()
@@ -236,23 +250,30 @@ class FurmarkWidget(QOpenGLWidget):
         fmt.setSwapInterval(1 if vsync else 0)
         self.setFormat(fmt)
 
-    def initializeGL(self):
-        self.prog = QOpenGLShaderProgram(self)
-        self.prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Vertex, VERTEX_SHADER_SRC)
-        self.prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Fragment, FRAGMENT_SHADER_SRC)
-        self.prog.link()
+    def set_geometry_lod(self, seg, sides):
+        self.mesh_seg = seg
+        self.mesh_sides = sides
+        if self.isValid():
+            self.makeCurrent()
+            self._rebuild_buffers()
+            self.doneCurrent()
 
-        verts, inds = generate_torus_geometry(160, 64, 1.0, 0.42)
+    def _rebuild_buffers(self):
+        verts, inds = generate_torus_geometry(self.mesh_seg, self.mesh_sides, 1.0, 0.42)
         self.num_indices = len(inds)
 
-        vao = (ctypes.c_uint * 1)()
-        libgl.glGenVertexArrays(1, vao)
-        self.vao = vao[0]
+        if not self.vao:
+            vao = (ctypes.c_uint * 1)()
+            libgl.glGenVertexArrays(1, vao)
+            self.vao = vao[0]
+
         libgl.glBindVertexArray(self.vao)
 
-        vbo = (ctypes.c_uint * 1)()
-        libgl.glGenBuffers(1, vbo)
-        libgl.glBindBuffer(0x8892, vbo[0])
+        if not self.vbo:
+            vbo = (ctypes.c_uint * 1)()
+            libgl.glGenBuffers(1, vbo)
+            self.vbo = vbo[0]
+        libgl.glBindBuffer(0x8892, self.vbo)
         libgl.glBufferData(0x8892, verts.nbytes, verts.ctypes.data, 0x88E4)
 
         libgl.glVertexAttribPointer(0, 3, 0x1406, 0, 32, None)
@@ -262,12 +283,22 @@ class FurmarkWidget(QOpenGLWidget):
         libgl.glVertexAttribPointer(2, 2, 0x1406, 0, 32, ctypes.c_void_p(24))
         libgl.glEnableVertexAttribArray(2)
 
-        ebo = (ctypes.c_uint * 1)()
-        libgl.glGenBuffers(1, ebo)
-        libgl.glBindBuffer(0x8893, ebo[0])
+        if not self.ebo:
+            ebo = (ctypes.c_uint * 1)()
+            libgl.glGenBuffers(1, ebo)
+            self.ebo = ebo[0]
+        libgl.glBindBuffer(0x8893, self.ebo)
         libgl.glBufferData(0x8893, inds.nbytes, inds.ctypes.data, 0x88E4)
 
         libgl.glBindVertexArray(0)
+
+    def initializeGL(self):
+        self.prog = QOpenGLShaderProgram(self)
+        self.prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Vertex, VERTEX_SHADER_SRC)
+        self.prog.addShaderFromSourceCode(QOpenGLShader.ShaderTypeBit.Fragment, FRAGMENT_SHADER_SRC)
+        self.prog.link()
+
+        self._rebuild_buffers()
 
     def resizeGL(self, w, h):
         libgl.glViewport(0, 0, w, h)
@@ -329,6 +360,7 @@ class FurmarkWidget(QOpenGLWidget):
         self.prog.setUniformValue("uIterations", int(self.iterations))
         self.prog.setUniformValue("uFurDensityExp", float(self.fur_density_exp))
         self.prog.setUniformValue("uColorTheme", int(self.color_theme))
+        self.prog.setUniformValue("uEnableSpecular", 1 if self.specular else 0)
 
         # Massive instanced draw call: renders millions of fur polygons
         libgl.glBindVertexArray(self.vao)
@@ -337,31 +369,40 @@ class FurmarkWidget(QOpenGLWidget):
 
         self.prog.release()
 
+        # Framerate limiter if active (e.g. 60 FPS, 144 FPS)
+        if self.target_fps > 0:
+            target_dt = 1.0 / self.target_fps
+            spent = time.time() - now
+            rem = target_dt - spent
+            if rem > 0.001:
+                time.sleep(rem)
+
         # Trigger immediate next frame for continuous burn
         self.update()
 
 class GpuStressDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("CACHYPULSE — GPU STRESS BURNER (FURMARK)")
-        self.resize(1200, 780)
-        self.setMinimumSize(920, 600)
+        self.setWindowTitle("CACHYPULSE — GPU STRESS BURNER (FURMARK 3D)")
+        self.resize(1240, 800)
+        self.setMinimumSize(940, 620)
         self.setStyleSheet("background-color: #000000; color: #FFFFFF;")
 
         self.nvml = NvmlClient()
         self.max_temp_limit = 86
-        self.current_msaa = 4
+        self.current_msaa = 1  # 1x default ensures smooth 100+ FPS on any setting
         self.current_vsync = False
+        self.adv_expanded = True
 
         self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(16, 16, 16, 16)
+        self.layout.setContentsMargins(14, 14, 14, 14)
         self.layout.setSpacing(10)
 
         # ---------------- 1. Primary Control Bar ----------------
         ctrl_bar = QFrame()
         ctrl_bar.setStyleSheet("background-color: #080808; border: 1px solid #1C1C1C; border-radius: 12px; padding: 8px 16px;")
         ctrl_l = QHBoxLayout(ctrl_bar)
-        ctrl_l.setSpacing(12)
+        ctrl_l.setSpacing(10)
 
         lbl_logo = QLabel("GPU BURNER")
         lbl_logo.setStyleSheet("font-family: 'JetBrainsMono Nerd Font', 'JetBrains Mono', monospace; font-size: 15px; font-weight: 800; color: #FFFFFF; letter-spacing: 1.5px;")
@@ -372,19 +413,29 @@ class GpuStressDialog(QDialog):
         ctrl_l.addWidget(QLabel("Preset:"))
         self.combo_preset = QComboBox()
         self.combo_preset.addItems([
-            "Normal (96 Camadas · 256 FMAs)",
-            "Alta (160 Camadas · 512 FMAs)",
-            "Extrema (256 Camadas · 1024 FMAs)",
-            "Ultra Burn (320 Camadas · 2048 FMAs)"
+            "Ultra Leve (144+ FPS · 32 Camadas)",
+            "Leve (60-120 FPS · 48 Camadas)",
+            "Equilibrado (64 Camadas · Padrão)",
+            "Padrão FurMark (96 Camadas)",
+            "Pesado (128 Camadas · Burn Alto)",
+            "Extremo (160 Camadas · 100% TDP)",
+            "Ultra Burn (192 Camadas · Carga Máxima)",
+            "Personalizado (Ajuste Manual)"
         ])
-        self.combo_preset.setCurrentIndex(1)
+        self.combo_preset.setCurrentIndex(2) # Default Equilibrado (~140 FPS)
         self.combo_preset.currentIndexChanged.connect(self._change_preset)
         ctrl_l.addWidget(self.combo_preset)
 
         ctrl_l.addWidget(QLabel("Resolução:"))
         self.combo_res = QComboBox()
-        self.combo_res.addItems(["1280x720 (HD)", "1600x900", "1920x1080 (FHD)", "2560x1440 (2K)"])
-        self.combo_res.setCurrentIndex(0)
+        self.combo_res.addItems([
+            "960x540 (qHD Econômico)",
+            "1280x720 (720p HD)",
+            "1600x900",
+            "1920x1080 (1080p FHD)",
+            "2560x1440 (2K QHD)"
+        ])
+        self.combo_res.setCurrentIndex(1)
         self.combo_res.currentIndexChanged.connect(self._change_resolution)
         ctrl_l.addWidget(self.combo_res)
 
@@ -393,12 +444,10 @@ class GpuStressDialog(QDialog):
         self.btn_fullscreen.clicked.connect(self._toggle_fullscreen)
         ctrl_l.addWidget(self.btn_fullscreen)
 
-        ctrl_l.addWidget(QLabel("Anti-Aliasing:"))
-        self.combo_msaa = QComboBox()
-        self.combo_msaa.addItems(["Sem MSAA (1x)", "2x MSAA", "4x MSAA", "8x MSAA"])
-        self.combo_msaa.setCurrentIndex(2) # Default 4x
-        self.combo_msaa.currentIndexChanged.connect(self._change_msaa)
-        ctrl_l.addWidget(self.combo_msaa)
+        self.btn_toggle_adv = QPushButton("Ajustes Avançados")
+        self.btn_toggle_adv.setStyleSheet("background: #101010; border: 1px solid #262626; color: #00D2FF; font-weight: 600; padding: 6px 14px; border-radius: 6px;")
+        self.btn_toggle_adv.clicked.connect(self._toggle_adv_panel)
+        ctrl_l.addWidget(self.btn_toggle_adv)
 
         ctrl_l.addWidget(QLabel("Limite Térmico:"))
         self.spin_temp = QSpinBox()
@@ -415,61 +464,98 @@ class GpuStressDialog(QDialog):
 
         self.layout.addWidget(ctrl_bar)
 
-        # ---------------- 2. Advanced Graphics Tweaks Bar ----------------
-        tweaks_bar = QFrame()
-        tweaks_bar.setStyleSheet("background-color: #060606; border: 1px solid #161616; border-radius: 10px; padding: 6px 16px;")
-        tb_l = QHBoxLayout(tweaks_bar)
-        tb_l.setSpacing(14)
+        # ---------------- 2. Advanced Graphics Tweaks Grid (Granular Controls) ----------------
+        self.adv_card = QFrame()
+        self.adv_card.setStyleSheet("background-color: #060606; border: 1px solid #161616; border-radius: 12px; padding: 12px 18px;")
+        adv_grid = QGridLayout(self.adv_card)
+        adv_grid.setHorizontalSpacing(16)
+        adv_grid.setVerticalSpacing(8)
 
-        tb_l.addWidget(QLabel("Tema Visual:"))
-        self.combo_theme = QComboBox()
-        self.combo_theme.addItems([
-            "Dourado Clássico (FurMark)",
-            "Chamas & Magma (Fogo)",
-            "CachyOS Verde Neon",
-            "Cyberpunk Violeta",
-            "Platina Monocromático"
-        ])
-        self.combo_theme.currentIndexChanged.connect(self._change_theme)
-        tb_l.addWidget(self.combo_theme)
+        # Section 1: Performance & Geometry
+        adv_grid.addWidget(QLabel("Camadas (Shells):"), 0, 0)
+        self.combo_shells = QComboBox()
+        self.combo_shells.addItems(["24 Camadas", "32 Camadas", "48 Camadas", "64 Camadas", "96 Camadas", "128 Camadas", "160 Camadas", "192 Camadas"])
+        self.combo_shells.setCurrentIndex(3) # 64
+        self.combo_shells.currentIndexChanged.connect(self._on_manual_shell_change)
+        adv_grid.addWidget(self.combo_shells, 0, 1)
 
-        tb_l.addWidget(QLabel("Densidade da Pelagem:"))
+        adv_grid.addWidget(QLabel("Carga ALU (FMAs):"), 0, 2)
+        self.combo_fma = QComboBox()
+        self.combo_fma.addItems(["0 (Geometria Pura · Ultra Rápido)", "8 FMAs (Mínimo)", "16 FMAs (Leve)", "24 FMAs (Equilibrado)", "32 FMAs (Padrão)", "48 FMAs (Alto)", "64 FMAs (Pesado)", "96 FMAs (Extremo)"])
+        self.combo_fma.setCurrentIndex(3) # 24
+        self.combo_fma.currentIndexChanged.connect(self._on_manual_fma_change)
+        adv_grid.addWidget(self.combo_fma, 0, 3)
+
+        adv_grid.addWidget(QLabel("Anti-Aliasing:"), 0, 4)
+        self.combo_msaa = QComboBox()
+        self.combo_msaa.addItems(["Desativado (1x · Máx. FPS)", "2x MSAA", "4x MSAA", "8x MSAA"])
+        self.combo_msaa.setCurrentIndex(0) # 1x default
+        self.combo_msaa.currentIndexChanged.connect(self._change_msaa)
+        adv_grid.addWidget(self.combo_msaa, 0, 5)
+
+        adv_grid.addWidget(QLabel("Malha do Toro (LOD):"), 0, 6)
+        self.combo_lod = QComboBox()
+        self.combo_lod.addItems(["Baixa (80x32 · 5k tris)", "Média (120x48 · 11k tris)", "Alta (160x64 · 20k tris)"])
+        self.combo_lod.setCurrentIndex(1) # Medium default
+        self.combo_lod.currentIndexChanged.connect(self._change_lod)
+        adv_grid.addWidget(self.combo_lod, 0, 7)
+
+        # Section 2: Visual Styling & Fur Characteristics
+        adv_grid.addWidget(QLabel("Densidade do Pelo:"), 1, 0)
         self.combo_density = QComboBox()
-        self.combo_density.addItems(["Normal (Clássica)", "Densa (Peluda)", "Super Densa (Espessa)", "Sólida / Tapete de Lã"])
-        self.combo_density.setCurrentIndex(1) # Densa
+        self.combo_density.addItems(["Fina / Esparsa", "Normal (Clássica)", "Densa (Peluda)", "Super Densa / Lã"])
+        self.combo_density.setCurrentIndex(2) # Densa
         self.combo_density.currentIndexChanged.connect(self._change_density)
-        tb_l.addWidget(self.combo_density)
+        adv_grid.addWidget(self.combo_density, 1, 1)
 
-        tb_l.addWidget(QLabel("Comprimento:"))
+        adv_grid.addWidget(QLabel("Comprimento Fiapos:"), 1, 2)
         self.combo_length = QComboBox()
-        self.combo_length.addItems(["Curto (0.10)", "Médio (0.16)", "Longo (0.26)", "Extremo (0.36)"])
-        self.combo_length.setCurrentIndex(1)
+        self.combo_length.addItems(["Curto (0.08)", "Médio (0.16)", "Longo (0.24)", "Extremo (0.34)"])
+        self.combo_length.setCurrentIndex(1) # 0.16
         self.combo_length.currentIndexChanged.connect(self._change_length)
-        tb_l.addWidget(self.combo_length)
+        adv_grid.addWidget(self.combo_length, 1, 3)
 
-        tb_l.addWidget(QLabel("Rotação:"))
+        adv_grid.addWidget(QLabel("Tema de Cores:"), 1, 4)
+        self.combo_theme = QComboBox()
+        self.combo_theme.addItems(["Dourado (FurMark)", "Chamas / Magma", "CachyOS Verde", "Cyberpunk", "Platina Monocromático"])
+        self.combo_theme.currentIndexChanged.connect(self._change_theme)
+        adv_grid.addWidget(self.combo_theme, 1, 5)
+
+        adv_grid.addWidget(QLabel("Taxa de Quadros:"), 1, 6)
+        self.combo_fps_limit = QComboBox()
+        self.combo_fps_limit.addItems(["Desbloqueado (Máx. Carga)", "Trava 60 FPS", "Trava 144 FPS", "V-Sync Ativado"])
+        self.combo_fps_limit.currentIndexChanged.connect(self._change_fps_limit)
+        adv_grid.addWidget(self.combo_fps_limit, 1, 7)
+
+        # Section 3: Physical Dynamics & Toggles
+        toggles_row = QHBoxLayout()
+        toggles_row.setSpacing(16)
+
+        self.chk_gravity = QCheckBox("Gravidade (Queda física)")
+        self.chk_gravity.setChecked(True)
+        self.chk_gravity.toggled.connect(self._toggle_gravity)
+        toggles_row.addWidget(self.chk_gravity)
+
+        self.chk_wind = QCheckBox("Vento (Ondulação dos fios)")
+        self.chk_wind.setChecked(True)
+        self.chk_wind.toggled.connect(self._toggle_wind)
+        toggles_row.addWidget(self.chk_wind)
+
+        self.chk_specular = QCheckBox("Brilho Especular (Glossy sheen)")
+        self.chk_specular.setChecked(True)
+        self.chk_specular.toggled.connect(self._toggle_specular)
+        toggles_row.addWidget(self.chk_specular)
+
+        toggles_row.addStretch()
+
+        toggles_row.addWidget(QLabel("Rotação:"))
         self.combo_rot = QComboBox()
         self.combo_rot.addItems(["Normal (1x)", "Rápida (2x)", "Lenta (0.5x)", "Pausada"])
         self.combo_rot.currentIndexChanged.connect(self._change_rotation)
-        tb_l.addWidget(self.combo_rot)
+        toggles_row.addWidget(self.combo_rot)
 
-        self.chk_gravity = QCheckBox("Gravidade")
-        self.chk_gravity.setChecked(True)
-        self.chk_gravity.toggled.connect(self._toggle_gravity)
-        tb_l.addWidget(self.chk_gravity)
-
-        self.chk_wind = QCheckBox("Vento")
-        self.chk_wind.setChecked(True)
-        self.chk_wind.toggled.connect(self._toggle_wind)
-        tb_l.addWidget(self.chk_wind)
-
-        self.chk_vsync = QCheckBox("Trava 60 FPS")
-        self.chk_vsync.setChecked(False)
-        self.chk_vsync.toggled.connect(self._toggle_vsync)
-        tb_l.addWidget(self.chk_vsync)
-
-        tb_l.addStretch()
-        self.layout.addWidget(tweaks_bar)
+        adv_grid.addLayout(toggles_row, 2, 0, 1, 8)
+        self.layout.addWidget(self.adv_card)
 
         # ---------------- 3. OpenGL 3D Viewport ----------------
         self.gl_widget = FurmarkWidget(msaa=self.current_msaa, vsync=self.current_vsync, parent=self)
@@ -522,32 +608,83 @@ class GpuStressDialog(QDialog):
         self.timer.timeout.connect(self._poll_gpu)
         self.timer.start(1000)
 
-        # Initial Preset config
-        self._change_preset(1)
+        # Apply initial preset: Equilibrado (~140 FPS)
+        self._change_preset(2)
 
         # Fullscreen Shortcut (F11)
         self.shortcut_f11 = QShortcut(QKeySequence(Qt.Key.Key_F11), self)
         self.shortcut_f11.activated.connect(self._toggle_fullscreen)
 
     # ------------------ EVENT HANDLERS & GRAPHICS SWITCHING ------------------
+    def _toggle_adv_panel(self):
+        self.adv_expanded = not self.adv_expanded
+        self.adv_card.setVisible(self.adv_expanded)
+        self.btn_toggle_adv.setText("Ajustes Avançados ▲" if self.adv_expanded else "Ajustes Avançados ▼")
+
     def _change_preset(self, idx):
-        if idx == 0: # Normal
-            self.gl_widget.shell_count = 96
-            self.gl_widget.iterations = 256
-        elif idx == 1: # Alta
-            self.gl_widget.shell_count = 160
-            self.gl_widget.iterations = 512
-        elif idx == 2: # Extrema
-            self.gl_widget.shell_count = 256
-            self.gl_widget.iterations = 1024
-        else: # Ultra Burn
-            self.gl_widget.shell_count = 320
-            self.gl_widget.iterations = 2048
+        if idx == 7: # Personalizado
+            return
+
+        presets = [
+            # shells, iters, lod_idx, msaa_idx
+            (32, 8, 0, 0),   # 0: Ultra Leve (300+ FPS)
+            (48, 16, 1, 0),  # 1: Leve (180+ FPS)
+            (64, 24, 1, 0),  # 2: Equilibrado (~140 FPS)
+            (96, 32, 2, 0),  # 3: Padrão FurMark (~100 FPS)
+            (128, 48, 2, 1), # 4: Pesado (~60 FPS)
+            (160, 64, 2, 2), # 5: Extremo (~45 FPS)
+            (192, 96, 2, 2), # 6: Ultra Burn (~30 FPS)
+        ]
+
+        if idx < len(presets):
+            shells, iters, lod, msaa = presets[idx]
+
+            self.gl_widget.shell_count = shells
+            self.gl_widget.iterations = iters
+
+            # Sync UI controls
+            shell_map = [24, 32, 48, 64, 96, 128, 160, 192]
+            if shells in shell_map:
+                self.combo_shells.blockSignals(True)
+                self.combo_shells.setCurrentIndex(shell_map.index(shells))
+                self.combo_shells.blockSignals(False)
+
+            fma_map = [0, 8, 16, 24, 32, 48, 64, 96]
+            if iters in fma_map:
+                self.combo_fma.blockSignals(True)
+                self.combo_fma.setCurrentIndex(fma_map.index(iters))
+                self.combo_fma.blockSignals(False)
+
+            self.combo_lod.blockSignals(True)
+            self.combo_lod.setCurrentIndex(lod)
+            self.combo_lod.blockSignals(False)
+            self._change_lod(lod)
+
+            if msaa != (self.current_msaa // 2 if self.current_msaa > 1 else 0):
+                self.combo_msaa.blockSignals(True)
+                self.combo_msaa.setCurrentIndex(msaa)
+                self.combo_msaa.blockSignals(False)
+                self._change_msaa(msaa)
+
+    def _on_manual_shell_change(self, idx):
+        shell_map = [24, 32, 48, 64, 96, 128, 160, 192]
+        self.gl_widget.shell_count = shell_map[idx]
+        self.combo_preset.setCurrentIndex(7) # Set to Personalizado
+
+    def _on_manual_fma_change(self, idx):
+        fma_map = [0, 8, 16, 24, 32, 48, 64, 96]
+        self.gl_widget.iterations = fma_map[idx]
+        self.combo_preset.setCurrentIndex(7)
+
+    def _change_lod(self, idx):
+        lod_table = [(80, 32), (120, 48), (160, 64)]
+        seg, sides = lod_table[idx]
+        self.gl_widget.set_geometry_lod(seg, sides)
 
     def _change_resolution(self, idx):
         if self.isFullScreen():
             self.showNormal()
-        res_map = [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440)]
+        res_map = [(960, 540), (1280, 720), (1600, 900), (1920, 1080), (2560, 1440)]
         if 0 <= idx < len(res_map):
             w, h = res_map[idx]
             self.resize(w, h)
@@ -567,7 +704,6 @@ class GpuStressDialog(QDialog):
             return
 
         self.current_msaa = new_msaa
-        # Recreate viewport with new multisample quality
         old_widget = self.gl_widget
         old_widget.running = False
 
@@ -577,9 +713,12 @@ class GpuStressDialog(QDialog):
         self.gl_widget.fur_length = old_widget.fur_length
         self.gl_widget.fur_density_exp = old_widget.fur_density_exp
         self.gl_widget.color_theme = old_widget.color_theme
+        self.gl_widget.specular = old_widget.specular
         self.gl_widget.gravity = old_widget.gravity
         self.gl_widget.wind = old_widget.wind
         self.gl_widget.rot_speed = old_widget.rot_speed
+        self.gl_widget.target_fps = old_widget.target_fps
+        self.gl_widget.set_geometry_lod(old_widget.mesh_seg, old_widget.mesh_sides)
         self.gl_widget.stats_updated.connect(self._on_stats_updated)
 
         self.layout.replaceWidget(old_widget, self.gl_widget)
@@ -589,17 +728,36 @@ class GpuStressDialog(QDialog):
         self.gl_widget.color_theme = idx
 
     def _change_density(self, idx):
-        # Higher exponent keeps more fur fibers intact near the body
-        exp_map = [1.2, 1.5, 1.8, 2.2]
+        exp_map = [1.1, 1.4, 1.7, 2.1]
         self.gl_widget.fur_density_exp = exp_map[idx]
 
     def _change_length(self, idx):
-        len_map = [0.10, 0.16, 0.26, 0.36]
+        len_map = [0.08, 0.16, 0.24, 0.34]
         self.gl_widget.fur_length = len_map[idx]
 
     def _change_rotation(self, idx):
         speed_map = [1.0, 2.0, 0.5, 0.0]
         self.gl_widget.rot_speed = speed_map[idx]
+
+    def _change_fps_limit(self, idx):
+        if idx == 0: # Desbloqueado
+            self.gl_widget.target_fps = 0
+            self._set_vsync(False)
+        elif idx == 1: # 60 FPS
+            self.gl_widget.target_fps = 60
+            self._set_vsync(False)
+        elif idx == 2: # 144 FPS
+            self.gl_widget.target_fps = 144
+            self._set_vsync(False)
+        elif idx == 3: # V-Sync
+            self.gl_widget.target_fps = 0
+            self._set_vsync(True)
+
+    def _set_vsync(self, enabled):
+        self.current_vsync = enabled
+        fmt = self.gl_widget.format()
+        fmt.setSwapInterval(1 if enabled else 0)
+        self.gl_widget.setFormat(fmt)
 
     def _toggle_gravity(self, checked):
         self.gl_widget.gravity = checked
@@ -607,11 +765,8 @@ class GpuStressDialog(QDialog):
     def _toggle_wind(self, checked):
         self.gl_widget.wind = checked
 
-    def _toggle_vsync(self, checked):
-        self.current_vsync = checked
-        fmt = self.gl_widget.format()
-        fmt.setSwapInterval(1 if checked else 0)
-        self.gl_widget.setFormat(fmt)
+    def _toggle_specular(self, checked):
+        self.gl_widget.specular = checked
 
     def _on_stats_updated(self, fps, frametime):
         self.lbl_fps.setText(f"FPS: {fps:.0f}")
